@@ -274,7 +274,7 @@ struct ContentView: View {
 }
 
 private struct GitHubIconLink: View {
-    private let profileURL = URL(string: "https://github.com/Nov-Two")!
+    private let profileURL = URL(string: "https://github.com/")!
 
     var body: some View {
         Button {
