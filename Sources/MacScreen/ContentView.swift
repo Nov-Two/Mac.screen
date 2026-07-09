@@ -121,13 +121,7 @@ struct ContentView: View {
             Text("下载")
                 .foregroundStyle(.secondary)
             Spacer()
-            Link(destination: URL(string: "https://github.com/Nov-Two")!) {
-                GitHubMark()
-                    .frame(width: 18, height: 18)
-                    .foregroundStyle(.primary)
-            }
-            .buttonStyle(.plain)
-            .help("GitHub")
+            GitHubIconLink()
         }
         .font(.callout)
         .padding(.horizontal, 22)
@@ -279,49 +273,40 @@ struct ContentView: View {
     }
 }
 
-private struct GitHubMark: Shape {
-    func path(in rect: CGRect) -> Path {
-        let points: [CGPoint] = [
-            CGPoint(x: 8, y: 0), CGPoint(x: 3.58, y: 0), CGPoint(x: 0, y: 3.58), CGPoint(x: 0, y: 8),
-            CGPoint(x: 0, y: 11.54), CGPoint(x: 2.29, y: 14.53), CGPoint(x: 5.47, y: 15.59),
-            CGPoint(x: 5.87, y: 15.66), CGPoint(x: 6.02, y: 15.42), CGPoint(x: 6.02, y: 15.21),
-            CGPoint(x: 6.02, y: 15.02), CGPoint(x: 6.01, y: 14.39), CGPoint(x: 6.01, y: 13.73),
-            CGPoint(x: 4.00, y: 14.10), CGPoint(x: 3.48, y: 13.24), CGPoint(x: 3.32, y: 12.79),
-            CGPoint(x: 3.23, y: 12.56), CGPoint(x: 2.84, y: 11.85), CGPoint(x: 2.50, y: 11.66),
-            CGPoint(x: 2.22, y: 11.51), CGPoint(x: 1.82, y: 11.14), CGPoint(x: 2.49, y: 11.13),
-            CGPoint(x: 3.12, y: 11.12), CGPoint(x: 3.57, y: 11.71), CGPoint(x: 3.72, y: 11.95),
-            CGPoint(x: 4.44, y: 13.16), CGPoint(x: 5.59, y: 12.82), CGPoint(x: 6.05, y: 12.61),
-            CGPoint(x: 6.12, y: 12.09), CGPoint(x: 6.33, y: 11.74), CGPoint(x: 6.56, y: 11.54),
-            CGPoint(x: 4.78, y: 11.34), CGPoint(x: 2.92, y: 10.65), CGPoint(x: 2.92, y: 7.59),
-            CGPoint(x: 2.92, y: 6.72), CGPoint(x: 3.23, y: 6.00), CGPoint(x: 3.74, y: 5.44),
-            CGPoint(x: 3.66, y: 5.24), CGPoint(x: 3.38, y: 4.42), CGPoint(x: 3.82, y: 3.32),
-            CGPoint(x: 3.82, y: 3.32), CGPoint(x: 4.49, y: 3.11), CGPoint(x: 6.02, y: 4.14),
-            CGPoint(x: 6.66, y: 3.96), CGPoint(x: 7.34, y: 3.87), CGPoint(x: 8.02, y: 3.87),
-            CGPoint(x: 8.70, y: 3.87), CGPoint(x: 9.38, y: 3.96), CGPoint(x: 10.02, y: 4.14),
-            CGPoint(x: 11.55, y: 3.10), CGPoint(x: 12.22, y: 3.32), CGPoint(x: 12.22, y: 3.32),
-            CGPoint(x: 12.66, y: 4.42), CGPoint(x: 12.38, y: 5.24), CGPoint(x: 12.30, y: 5.44),
-            CGPoint(x: 12.81, y: 6.00), CGPoint(x: 13.12, y: 6.72), CGPoint(x: 13.12, y: 7.59),
-            CGPoint(x: 13.12, y: 10.66), CGPoint(x: 11.25, y: 11.34), CGPoint(x: 9.47, y: 11.54),
-            CGPoint(x: 9.76, y: 11.79), CGPoint(x: 10.01, y: 12.27), CGPoint(x: 10.01, y: 13.02),
-            CGPoint(x: 10.01, y: 14.09), CGPoint(x: 10.00, y: 14.95), CGPoint(x: 10.00, y: 15.22),
-            CGPoint(x: 10.00, y: 15.43), CGPoint(x: 10.15, y: 15.68), CGPoint(x: 10.55, y: 15.60),
-            CGPoint(x: 13.72, y: 14.53), CGPoint(x: 16, y: 11.54), CGPoint(x: 16, y: 8),
-            CGPoint(x: 16, y: 3.58), CGPoint(x: 12.42, y: 0), CGPoint(x: 8, y: 0)
-        ]
+private struct GitHubIconLink: View {
+    private let profileURL = URL(string: "https://github.com/Nov-Two")!
 
-        let scale = min(rect.width, rect.height) / 16
-        let offset = CGPoint(
-            x: rect.midX - 8 * scale,
-            y: rect.midY - 8 * scale
-        )
-        var path = Path()
-        guard let first = points.first else { return path }
-        path.move(to: CGPoint(x: first.x * scale + offset.x, y: first.y * scale + offset.y))
-        for point in points.dropFirst() {
-            path.addLine(to: CGPoint(x: point.x * scale + offset.x, y: point.y * scale + offset.y))
+    var body: some View {
+        Button {
+            NSWorkspace.shared.open(profileURL)
+        } label: {
+            if let image = Self.githubImage {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                Image(systemName: "link")
+                    .resizable()
+                    .scaledToFit()
+            }
         }
-        path.closeSubpath()
-        return path
+        .buttonStyle(.plain)
+        .frame(width: 18, height: 18)
+        .contentShape(Rectangle())
+        .help("GitHub 作者主页")
+        .accessibilityLabel("GitHub 作者主页")
+    }
+
+    private static var githubImage: NSImage? {
+        guard let url = Bundle.main.url(
+            forResource: "GitHubMark",
+            withExtension: "png",
+            subdirectory: "Links"
+        ) else {
+            return nil
+        }
+
+        return NSImage(contentsOf: url)
     }
 }
 

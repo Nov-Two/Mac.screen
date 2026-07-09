@@ -18,6 +18,7 @@ build:
 	@rm -rf $(APP_BUNDLE)/Contents/Resources/Videos
 	@ditto Videos $(APP_BUNDLE)/Contents/Resources/Videos
 	@ditto Assets/Thumbnails $(APP_BUNDLE)/Contents/Resources/Thumbnails
+	@ditto Assets/Links $(APP_BUNDLE)/Contents/Resources/Links
 	@cp Assets/AppIcon/MacScreenIcon.icns $(APP_BUNDLE)/Contents/Resources/MacScreenIcon.icns
 	@DEVELOPER_DIR_CANDIDATE="$$(find "$(HOME)/Applications" /Applications -maxdepth 3 -path '*/Xcode*.app/Contents/Developer' -print -quit 2>/dev/null)"; \
 	if [ -n "$$DEVELOPER_DIR_CANDIDATE" ]; then \

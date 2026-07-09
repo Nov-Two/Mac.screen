@@ -2,7 +2,7 @@
 
 ## 2026-07-09
 
-- Added ad-hoc app signing and a GitHub profile icon link.
+- Added ad-hoc app signing and a static GitHub profile icon link.
 - Added visible sidebar controls for single delete, batch delete, and bundled-resource reset.
 - Slimmed the repository by keeping generated thumbnails and app icon outputs out of source control.
 - Added batch deletion and optional delete-confirmation suppression.
