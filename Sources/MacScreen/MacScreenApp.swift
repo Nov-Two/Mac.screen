@@ -13,6 +13,7 @@ struct MacScreenApp: App {
                 wallpaperController: wallpaperController
             )
             .frame(minWidth: 980, minHeight: 640)
+            .background(MainWindowAccessor())
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
                 wallpaperController.stop()
             }
