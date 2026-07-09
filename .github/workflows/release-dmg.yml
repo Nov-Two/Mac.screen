@@ -20,6 +20,9 @@ jobs:
     runs-on: macos-14
     env:
       HAS_DEVELOPER_ID: ${{ secrets.DEVELOPER_ID_CERTIFICATE_BASE64 != '' }}
+      HAS_SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_ED_KEY != '' }}
+      HAS_SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_ED_KEY != '' }}
+      RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
     steps:
       - name: Check out repository
@@ -27,6 +30,13 @@ jobs:
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Validate Sparkle secrets
+        run: |
+          if [ "$HAS_SPARKLE_PUBLIC_KEY" != "$HAS_SPARKLE_PRIVATE_KEY" ]; then
+            echo "SPARKLE_PUBLIC_ED_KEY and SPARKLE_PRIVATE_ED_KEY must be configured together."
+            exit 1
+          fi
 
       - name: Import Developer ID certificate
         if: env.HAS_DEVELOPER_ID == 'true'
@@ -48,12 +58,15 @@ jobs:
 
       - name: Build ad-hoc signed DMG
         if: env.HAS_DEVELOPER_ID != 'true'
+        env:
+          SPARKLE_PUBLIC_ED_KEY: ${{ secrets.SPARKLE_PUBLIC_ED_KEY }}
         run: make package
 
       - name: Build Developer ID signed DMG
         if: env.HAS_DEVELOPER_ID == 'true'
         env:
           SIGN_IDENTITY: ${{ secrets.DEVELOPER_ID_APPLICATION_IDENTITY }}
+          SPARKLE_PUBLIC_ED_KEY: ${{ secrets.SPARKLE_PUBLIC_ED_KEY }}
         run: make package SIGN_IDENTITY="$SIGN_IDENTITY" CODESIGN_FLAGS="--options runtime --timestamp"
 
       - name: Notarize DMG
@@ -73,12 +86,26 @@ jobs:
       - name: Show package size
         run: ls -lh dist/MacScreen.dmg
 
+      - name: Generate Sparkle appcast
+        if: env.HAS_SPARKLE_PRIVATE_KEY == 'true'
+        env:
+          SPARKLE_PRIVATE_ED_KEY: ${{ secrets.SPARKLE_PRIVATE_ED_KEY }}
+        run: Scripts/generate-appcast.sh "$RELEASE_TAG"
+
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          name: MacScreen ${{ github.event.inputs.tag || github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: MacScreen ${{ env.RELEASE_TAG }}
           files: dist/MacScreen.dmg
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish Sparkle appcast to GitHub Pages
+        if: env.HAS_SPARKLE_PRIVATE_KEY == 'true'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: dist/appcast
+          keep_files: true
