@@ -1,6 +1,7 @@
 .build/
 .swiftpm/
 dist/
+.sparkle-public-ed-key
 .DS_Store
 Assets/AppIcon/MacScreenIcon.icns
 Assets/AppIcon/MacScreenIcon.iconset/
