@@ -1,9 +1,10 @@
+import AppKit
 import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var store: WallpaperStore
     @ObservedObject var wallpaperController: WallpaperWindowController
-    @State private var itemPendingDeletion: WallpaperItem?
+    @State private var skipsDeleteConfirmation = UserDefaults.standard.bool(forKey: UserDefaultsKeys.skipsDeleteConfirmation)
 
     var body: some View {
         NavigationSplitView {
@@ -15,35 +16,6 @@ struct ContentView: View {
         .frame(minWidth: 920, minHeight: 600)
         .task {
             await store.load()
-        }
-        .alert(
-            "删除素材？",
-            isPresented: Binding(
-                get: { itemPendingDeletion != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        itemPendingDeletion = nil
-                    }
-                }
-            ),
-            presenting: itemPendingDeletion
-        ) { item in
-            Button("取消", role: .cancel) {}
-            Button("删除", role: .destructive) {
-                if wallpaperController.activeURL == item.url {
-                    wallpaperController.stop()
-                }
-
-                Task {
-                    await store.delete(item)
-                }
-            }
-        } message: { item in
-            if WallpaperLibrary.isUserVideo(item.url) {
-                Text("将删除这个自定义素材文件，此操作不可撤销。")
-            } else {
-                Text("内置素材不会从应用包中物理删除，但会从当前用户的列表中移除。")
-            }
         }
     }
 
@@ -60,7 +32,7 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding()
             } else {
-                List(selection: $store.selectedItem) {
+                List(selection: $store.selectedItems) {
                     ForEach(store.items) { item in
                         WallpaperRow(item: item)
                             .tag(item)
@@ -136,7 +108,7 @@ struct ContentView: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color.black)
 
-            if let item = store.selectedItem {
+            if let item = previewItem {
                 StaticWallpaperPreview(item: item)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay(alignment: .bottomLeading) {
@@ -176,20 +148,20 @@ struct ContentView: View {
             .disabled(wallpaperController.activeURL == nil)
 
             Button(role: .destructive) {
-                itemPendingDeletion = store.selectedItem
+                requestDeletion()
             } label: {
                 Label("删除素材", systemImage: "trash")
             }
-            .disabled(store.selectedItem == nil || store.isLoading)
+            .disabled(store.selectedItems.isEmpty || store.isLoading)
 
             Button {
-                guard let item = store.selectedItem else { return }
+                guard let item = previewItem else { return }
                 wallpaperController.apply(videoURL: item.url)
             } label: {
                 Label("应用到桌面", systemImage: "play.rectangle.fill")
             }
             .buttonStyle(.borderedProminent)
-            .disabled(store.selectedItem == nil)
+            .disabled(previewItem == nil)
         }
         .padding(.horizontal, 22)
         .padding(.vertical, 16)
@@ -200,7 +172,7 @@ struct ContentView: View {
         Group {
             if let activeURL = wallpaperController.activeURL {
                 Text("正在使用：\(activeURL.deletingPathExtension().lastPathComponent)")
-            } else if store.selectedItem != nil {
+            } else if !store.selectedItems.isEmpty {
                 Text("右侧为静态预览，桌面壁纸播放时不会抢占其他程序。")
             } else {
                 Text("选择一个资源后可应用到桌面。")
@@ -209,6 +181,64 @@ struct ContentView: View {
         .font(.callout)
         .foregroundStyle(.secondary)
         .lineLimit(1)
+    }
+
+    private var previewItem: WallpaperItem? {
+        store.selectedItems.sorted {
+            $0.title.localizedStandardCompare($1.title) == .orderedAscending
+        }.first ?? store.selectedItem
+    }
+
+    private func requestDeletion() {
+        let items = store.selectedItems
+        guard !items.isEmpty else { return }
+
+        if !skipsDeleteConfirmation && !confirmDeletion(for: items) {
+            return
+        }
+
+        if items.contains(where: { $0.url == wallpaperController.activeURL }) {
+            wallpaperController.stop()
+        }
+
+        Task {
+            await store.delete(items)
+        }
+    }
+
+    private func deleteConfirmationMessage(for items: Set<WallpaperItem>) -> String {
+        let customCount = items.filter { WallpaperLibrary.isUserVideo($0.url) }.count
+        let bundledCount = items.count - customCount
+        var parts: [String] = []
+
+        if customCount > 0 {
+            parts.append("将删除 \(customCount) 个自定义素材文件，此操作不可撤销")
+        }
+
+        if bundledCount > 0 {
+            parts.append("将从当前用户列表中移除 \(bundledCount) 个内置素材")
+        }
+
+        return parts.joined(separator: "；") + "。"
+    }
+
+    private func confirmDeletion(for items: Set<WallpaperItem>) -> Bool {
+        let alert = NSAlert()
+        alert.messageText = "删除素材？"
+        alert.informativeText = deleteConfirmationMessage(for: items)
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "删除")
+        alert.addButton(withTitle: "取消")
+        alert.showsSuppressionButton = true
+        alert.suppressionButton?.title = "下次不再提醒"
+
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn && alert.suppressionButton?.state == .on {
+            skipsDeleteConfirmation = true
+            UserDefaults.standard.set(true, forKey: UserDefaultsKeys.skipsDeleteConfirmation)
+        }
+
+        return response == .alertFirstButtonReturn
     }
 }
 

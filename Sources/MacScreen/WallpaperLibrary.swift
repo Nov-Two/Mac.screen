@@ -65,14 +65,29 @@ enum WallpaperLibrary {
         return importedURLs
     }
 
-    static func deleteVideo(at url: URL) throws -> String {
-        if isUserVideo(url) {
-            try FileManager.default.removeItem(at: url)
-            return "已删除自定义素材。"
+    static func deleteVideos(at urls: [URL]) throws -> String {
+        var customCount = 0
+        var bundledCount = 0
+
+        for url in urls {
+            if isUserVideo(url) {
+                if FileManager.default.fileExists(atPath: url.path) {
+                    try FileManager.default.removeItem(at: url)
+                }
+                customCount += 1
+            } else {
+                hideBundledVideo(at: url)
+                bundledCount += 1
+            }
         }
 
-        hideBundledVideo(at: url)
-        return "已从列表移除内置素材。"
+        if customCount > 0 && bundledCount > 0 {
+            return "已删除 \(customCount) 个自定义素材，并移除 \(bundledCount) 个内置素材。"
+        } else if customCount > 0 {
+            return "已删除 \(customCount) 个自定义素材。"
+        } else {
+            return "已从列表移除 \(bundledCount) 个内置素材。"
+        }
     }
 
     static func isUserVideo(_ url: URL) -> Bool {

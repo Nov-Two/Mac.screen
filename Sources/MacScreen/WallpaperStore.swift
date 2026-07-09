@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 final class WallpaperStore: ObservableObject {
     @Published private(set) var items: [WallpaperItem] = []
     @Published var selectedItem: WallpaperItem?
+    @Published var selectedItems = Set<WallpaperItem>()
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var importMessage: String?
@@ -17,6 +18,7 @@ final class WallpaperStore: ObservableObject {
         let loadedItems = await WallpaperLibrary.loadItems()
         items = loadedItems
         selectedItem = preferredInitialSelection(from: loadedItems)
+        selectedItems = selectedItem.map { [$0] } ?? []
         errorMessage = loadedItems.isEmpty ? "没有在素材目录中找到 mp4 文件。" : nil
         isLoading = false
     }
@@ -41,6 +43,7 @@ final class WallpaperStore: ObservableObject {
             let loadedItems = await WallpaperLibrary.loadItems()
             items = loadedItems
             selectedItem = preferredSelection(afterImporting: importedURLs, from: loadedItems)
+            selectedItems = selectedItem.map { [$0] } ?? []
             errorMessage = loadedItems.isEmpty ? "没有在素材目录中找到 mp4 文件。" : nil
             importMessage = importedURLs.isEmpty ? "没有导入支持的视频文件。" : "已导入 \(importedURLs.count) 个视频。"
         } catch {
@@ -50,20 +53,27 @@ final class WallpaperStore: ObservableObject {
         isLoading = false
     }
 
-    func delete(_ item: WallpaperItem) async {
+    func delete(_ itemsToDelete: Set<WallpaperItem>) async {
+        guard !itemsToDelete.isEmpty else { return }
+
         isLoading = true
         errorMessage = nil
         importMessage = nil
 
         do {
-            let message = try WallpaperLibrary.deleteVideo(at: item.url)
-            if UserDefaults.standard.string(forKey: UserDefaultsKeys.lastWallpaperPath) == item.url.path {
+            let deletedURLs = Set(itemsToDelete.map(\.url))
+            let message = try WallpaperLibrary.deleteVideos(at: Array(deletedURLs))
+            if
+                let lastPath = UserDefaults.standard.string(forKey: UserDefaultsKeys.lastWallpaperPath),
+                deletedURLs.contains(where: { $0.path == lastPath })
+            {
                 UserDefaults.standard.removeObject(forKey: UserDefaultsKeys.lastWallpaperPath)
             }
 
             let loadedItems = await WallpaperLibrary.loadItems()
             items = loadedItems
-            selectedItem = preferredSelection(afterDeleting: item, from: loadedItems)
+            selectedItem = preferredSelection(afterDeleting: itemsToDelete, from: loadedItems)
+            selectedItems = selectedItem.map { [$0] } ?? []
             errorMessage = loadedItems.isEmpty ? "没有在素材目录中找到视频文件。" : nil
             importMessage = message
         } catch {
@@ -94,7 +104,7 @@ final class WallpaperStore: ObservableObject {
         return items.first { $0.url == importedURL } ?? preferredInitialSelection(from: items)
     }
 
-    private func preferredSelection(afterDeleting deletedItem: WallpaperItem, from items: [WallpaperItem]) -> WallpaperItem? {
-        items.first { $0.url != deletedItem.url }
+    private func preferredSelection(afterDeleting deletedItems: Set<WallpaperItem>, from items: [WallpaperItem]) -> WallpaperItem? {
+        items.first { !deletedItems.contains($0) }
     }
 }
