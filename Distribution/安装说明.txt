@@ -1,0 +1,62 @@
+MacScreen 安装说明
+==================
+
+因为当前版本还没有 Apple Developer ID 签名和公证，macOS 可能会提示：
+
+“无法打开 MacScreen，因为无法验证开发者”
+或
+“MacScreen 已损坏，无法打开”
+
+这不是软件文件真的损坏，而是 macOS 对未公证 App 的安全拦截。
+
+
+推荐安装步骤
+------------
+
+1. 把 MacScreen 拖到 Applications 文件夹。
+
+2. 打开访达，进入“应用程序”。
+
+3. 找到 MacScreen。
+
+4. 不要直接双击，先按住 Control 再点击 MacScreen，或右键点击 MacScreen。
+
+5. 选择“打开”。
+
+6. 如果弹窗里还有“打开”按钮，再点击一次“打开”。
+
+
+如果仍然无法打开
+----------------
+
+请先确认 MacScreen 已经拖入 Applications 文件夹，然后按下面步骤操作：
+
+1. 打开“终端”。
+
+打开方式：
+
+- 按 Command + 空格
+- 输入：终端
+- 按回车
+
+2. 复制下面这行命令，粘贴到终端里，然后按回车：
+
+xattr -dr com.apple.quarantine /Applications/MacScreen.app
+
+3. 命令执行完成后，再回到“应用程序”里打开 MacScreen。
+
+
+如果终端提示权限不足
+--------------------
+
+可以改用下面这行命令：
+
+sudo xattr -dr com.apple.quarantine /Applications/MacScreen.app
+
+输入后按回车，终端可能会要求输入电脑开机密码。输入密码时屏幕不会显示字符，这是正常现象。输入完成后按回车即可。
+
+
+后续说明
+--------
+
+正式版本会尽量配置 Apple Developer ID 签名和 Apple notarization。配置完成后，用户下载后就不需要再手动执行上面的命令。

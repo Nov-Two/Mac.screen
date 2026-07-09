@@ -54,6 +54,7 @@ package: build
 	@rm -rf $(DMG_ROOT) $(DMG_PATH)
 	@mkdir -p $(DMG_ROOT)
 	@ditto $(APP_BUNDLE) $(DMG_ROOT)/$(APP_NAME).app
+	@cp Distribution/安装说明.txt $(DMG_ROOT)/安装说明.txt
 	@ln -s /Applications $(DMG_ROOT)/Applications
 	@hdiutil create \
 		-volname "$(APP_NAME)" \
