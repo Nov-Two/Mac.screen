@@ -8,8 +8,10 @@
     <string>local.macos.macscreen</string>
     <key>CFBundleName</key>
     <string>MacScreen</string>
+    <key>CFBundleDisplayName</key>
+    <string>MacScreen</string>
     <key>CFBundleIconFile</key>
-    <string>MacScreenIcon</string>
+    <string>MacScreenIcon.icns</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
