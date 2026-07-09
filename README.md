@@ -215,6 +215,85 @@ APPLE_APP_PASSWORD
 
 如果同事打开时被 macOS 提示无法验证开发者，右键 App 选择“打开”通常可以绕过。
 
+## 自动更新
+
+项目已接入 Sparkle 2，用于实现类似普通 macOS App 的自动更新体验：
+
+- App 菜单中会出现“检查更新...”
+- 配置好 Sparkle 密钥后，App 会定期检查更新
+- 用户确认后，Sparkle 会下载新版 DMG、替换本地 App，并在重启后生效
+
+自动更新源当前配置为：
+
+```text
+https://nov-two.github.io/Mac.screen/appcast.xml
+```
+
+### 一次性生成 Sparkle 密钥
+
+先拉取并构建一次依赖：
+
+```bash
+make build
+```
+
+然后生成 Sparkle EdDSA 密钥：
+
+```bash
+SPARKLE_BIN="$(find .build/artifacts -path '*/Sparkle/bin' -type d -print -quit)"
+"$SPARKLE_BIN/generate_keys"
+```
+
+命令会输出 `SUPublicEDKey`。把这个公钥保存为本地文件即可让本机打包出的 App 启用更新：
+
+```bash
+printf '%s' '这里替换为 SUPublicEDKey 的值' > .sparkle-public-ed-key
+```
+
+`.sparkle-public-ed-key` 已加入 `.gitignore`，不会提交到仓库。
+
+如果要让 GitHub Actions 正式发布自动更新，需要把 Sparkle 私钥导出：
+
+```bash
+"$SPARKLE_BIN/generate_keys" -x sparkle-private-key.txt
+```
+
+然后在 GitHub 仓库 Settings -> Secrets and variables -> Actions 中添加：
+
+```text
+SPARKLE_PUBLIC_ED_KEY
+SPARKLE_PRIVATE_ED_KEY
+```
+
+其中 `SPARKLE_PUBLIC_ED_KEY` 是 `SUPublicEDKey` 的值；`SPARKLE_PRIVATE_ED_KEY` 是 `sparkle-private-key.txt` 的文件内容。私钥不要提交到 Git。
+
+### 发布一个用户可自动更新的版本
+
+1. 修改 `App/Info.plist`：
+
+```text
+CFBundleShortVersionString: 0.1.0 -> 0.1.1
+CFBundleVersion: 1 -> 2
+```
+
+2. 更新 `CHANGELOG.md`，写清楚新增功能。
+
+3. 推送 tag：
+
+```bash
+git tag v0.1.1
+git push origin v0.1.1
+```
+
+GitHub Actions 会自动：
+
+- 构建 `dist/MacScreen.dmg`
+- 把 DMG 上传到 GitHub Release
+- 使用 Sparkle 私钥生成 `dist/appcast/appcast.xml`
+- 发布 `appcast.xml` 到 GitHub Pages
+
+用户本地已安装的旧版 App 再次检查更新时，就会看到新版本并可以直接更新。
+
 ## 运行策略
 
 为了避免影响正常工作，当前版本刻意采用低负载策略：
