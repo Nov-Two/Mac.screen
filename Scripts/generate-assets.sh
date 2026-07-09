@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 VIDEO_DIR="$ROOT_DIR/Videos"
 THUMB_DIR="$ROOT_DIR/Assets/Thumbnails"
-ICON_SRC="/Users/user/Downloads/OIP.webp"
 ICON_DIR="$ROOT_DIR/Assets/AppIcon"
+ICON_SRC="$ICON_DIR/icon.png"
 ICONSET_DIR="$ICON_DIR/MacScreenIcon.iconset"
 ICON_PNG="$ICON_DIR/source-1024.png"
 ICON_ICNS="$ICON_DIR/MacScreenIcon.icns"
@@ -32,8 +32,15 @@ if [[ -f "$ICON_SRC" && ( ! -f "$ICON_ICNS" || "$ICON_SRC" -nt "$ICON_ICNS" ) ]]
   rm -rf "$ICONSET_DIR"
   mkdir -p "$ICONSET_DIR"
 
-  sips -s format png "$ICON_SRC" --out "$ICON_PNG" >/dev/null
-  sips -Z 1024 --padToHeightWidth 1024 1024 --padColor FFFFFF "$ICON_PNG" --out "$ICON_PNG" >/dev/null
+  width="$(sips -g pixelWidth "$ICON_SRC" | awk '/pixelWidth/ { print $2 }')"
+  height="$(sips -g pixelHeight "$ICON_SRC" | awk '/pixelHeight/ { print $2 }')"
+  side="$width"
+  if (( height < width )); then
+    side="$height"
+  fi
+
+  sips --cropToHeightWidth "$side" "$side" "$ICON_SRC" --out "$ICON_PNG" >/dev/null
+  sips -s format png -Z 1024 "$ICON_PNG" --out "$ICON_PNG" >/dev/null
 
   sips -z 16 16 "$ICON_PNG" --out "$ICONSET_DIR/icon_16x16.png" >/dev/null
   sips -z 32 32 "$ICON_PNG" --out "$ICONSET_DIR/icon_16x16@2x.png" >/dev/null
