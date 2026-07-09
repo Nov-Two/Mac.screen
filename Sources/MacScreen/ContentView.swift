@@ -78,10 +78,27 @@ struct ContentView: View {
 
     private var detail: some View {
         VStack(spacing: 0) {
+            wallpaperLinkBar
             preview
             controls
         }
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var wallpaperLinkBar: some View {
+        HStack(spacing: 4) {
+            Text("更多精美壁纸请前往")
+                .foregroundStyle(.secondary)
+            Link("haowallpaper.com", destination: URL(string: "https://haowallpaper.com/")!)
+            Text("下载")
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .font(.callout)
+        .padding(.horizontal, 22)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.bar)
     }
 
     private var preview: some View {
