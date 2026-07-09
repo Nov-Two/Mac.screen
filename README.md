@@ -122,7 +122,7 @@ make package
 dist/MacScreen.dmg
 ```
 
-`dist/` 是本地生成产物，不提交到 Git。需要给同事安装时，重新执行 `make package` 生成最新 DMG，或把 DMG 上传到 GitLab Release。
+`dist/` 是本地生成产物，不提交到 Git。需要给同事安装时，可以本地执行 `make package`，也可以推送版本 tag 后让 GitHub Actions 自动构建并上传 DMG 到 GitHub Release。
 
 清理构建产物：
 
@@ -172,11 +172,23 @@ make package
 
 ## 内部分发
 
-内部测试可以先直接分发：
+内部测试可以先直接分发本地生成的 DMG：
 
 ```text
 dist/MacScreen.dmg
 ```
+
+正式分发推荐使用 GitHub Release。推送 `v*` tag 后，`.github/workflows/release-dmg.yml` 会在 GitHub macOS runner 上自动执行：
+
+```bash
+make package
+```
+
+并把生成的 `MacScreen.dmg` 上传到对应 Release。
+
+如果需要手动重新构建某个版本，也可以在 GitHub Actions 页面运行 `Build DMG Release`，输入要附加 DMG 的 tag。
+
+当前 DMG 体积主要来自内置视频资源。`Videos/` 约 260MB，而 DMG 已经使用压缩格式生成；要明显减小安装包，需要减少内置视频数量，或改成轻量 App 加用户自行导入/在线下载资源。
 
 如果同事打开时被 macOS 提示无法验证开发者，右键 App 选择“打开”通常可以绕过。更正式的公司内部分发建议后续增加 Developer ID 签名和 Apple notarization。
 

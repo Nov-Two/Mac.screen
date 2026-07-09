@@ -1,0 +1,43 @@
+name: Build DMG Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to attach the DMG to"
+        required: true
+        default: "v0.1.1"
+
+permissions:
+  contents: write
+
+jobs:
+  build-dmg:
+    name: Build and Upload DMG
+    runs-on: macos-14
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Build DMG
+        run: make package
+
+      - name: Show package size
+        run: ls -lh dist/MacScreen.dmg
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: MacScreen ${{ github.event.inputs.tag || github.ref_name }}
+          files: dist/MacScreen.dmg
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
