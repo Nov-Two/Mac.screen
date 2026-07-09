@@ -50,6 +50,29 @@ final class WallpaperStore: ObservableObject {
         isLoading = false
     }
 
+    func delete(_ item: WallpaperItem) async {
+        isLoading = true
+        errorMessage = nil
+        importMessage = nil
+
+        do {
+            let message = try WallpaperLibrary.deleteVideo(at: item.url)
+            if UserDefaults.standard.string(forKey: UserDefaultsKeys.lastWallpaperPath) == item.url.path {
+                UserDefaults.standard.removeObject(forKey: UserDefaultsKeys.lastWallpaperPath)
+            }
+
+            let loadedItems = await WallpaperLibrary.loadItems()
+            items = loadedItems
+            selectedItem = preferredSelection(afterDeleting: item, from: loadedItems)
+            errorMessage = loadedItems.isEmpty ? "没有在素材目录中找到视频文件。" : nil
+            importMessage = message
+        } catch {
+            errorMessage = "删除失败：\(error.localizedDescription)"
+        }
+
+        isLoading = false
+    }
+
     private func preferredInitialSelection(from items: [WallpaperItem]) -> WallpaperItem? {
         guard !items.isEmpty else { return nil }
 
@@ -69,5 +92,9 @@ final class WallpaperStore: ObservableObject {
         }
 
         return items.first { $0.url == importedURL } ?? preferredInitialSelection(from: items)
+    }
+
+    private func preferredSelection(afterDeleting deletedItem: WallpaperItem, from items: [WallpaperItem]) -> WallpaperItem? {
+        items.first { $0.url != deletedItem.url }
     }
 }

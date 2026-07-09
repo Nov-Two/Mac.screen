@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @ObservedObject var store: WallpaperStore
     @ObservedObject var wallpaperController: WallpaperWindowController
+    @State private var itemPendingDeletion: WallpaperItem?
 
     var body: some View {
         NavigationSplitView {
@@ -14,6 +15,35 @@ struct ContentView: View {
         .frame(minWidth: 920, minHeight: 600)
         .task {
             await store.load()
+        }
+        .alert(
+            "删除素材？",
+            isPresented: Binding(
+                get: { itemPendingDeletion != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        itemPendingDeletion = nil
+                    }
+                }
+            ),
+            presenting: itemPendingDeletion
+        ) { item in
+            Button("取消", role: .cancel) {}
+            Button("删除", role: .destructive) {
+                if wallpaperController.activeURL == item.url {
+                    wallpaperController.stop()
+                }
+
+                Task {
+                    await store.delete(item)
+                }
+            }
+        } message: { item in
+            if WallpaperLibrary.isUserVideo(item.url) {
+                Text("将删除这个自定义素材文件，此操作不可撤销。")
+            } else {
+                Text("内置素材不会从应用包中物理删除，但会从当前用户的列表中移除。")
+            }
         }
     }
 
@@ -144,6 +174,13 @@ struct ContentView: View {
                 Label("停止", systemImage: "stop.fill")
             }
             .disabled(wallpaperController.activeURL == nil)
+
+            Button(role: .destructive) {
+                itemPendingDeletion = store.selectedItem
+            } label: {
+                Label("删除素材", systemImage: "trash")
+            }
+            .disabled(store.selectedItem == nil || store.isLoading)
 
             Button {
                 guard let item = store.selectedItem else { return }

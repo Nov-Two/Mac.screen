@@ -31,10 +31,11 @@ enum WallpaperLibrary {
     static func loadItems() async -> [WallpaperItem] {
         var seenPaths = Set<String>()
         var allItems: [WallpaperItem] = []
+        let hiddenPaths = hiddenWallpaperPaths()
 
         for directory in [bundledVideoDirectory, userVideoDirectory] {
             let items = await loadItems(from: directory)
-            for item in items where seenPaths.insert(item.url.path).inserted {
+            for item in items where !hiddenPaths.contains(item.url.path) && seenPaths.insert(item.url.path).inserted {
                 allItems.append(item)
             }
         }
@@ -62,6 +63,20 @@ enum WallpaperLibrary {
         }
 
         return importedURLs
+    }
+
+    static func deleteVideo(at url: URL) throws -> String {
+        if isUserVideo(url) {
+            try FileManager.default.removeItem(at: url)
+            return "已删除自定义素材。"
+        }
+
+        hideBundledVideo(at: url)
+        return "已从列表移除内置素材。"
+    }
+
+    static func isUserVideo(_ url: URL) -> Bool {
+        url.standardizedFileURL.path.hasPrefix(userVideoDirectory.standardizedFileURL.path + "/")
     }
 
     private static func loadItems(from directory: URL) async -> [WallpaperItem] {
@@ -104,6 +119,16 @@ enum WallpaperLibrary {
 
     private static func isSupportedVideo(_ url: URL) -> Bool {
         supportedVideoExtensions.contains(url.pathExtension.lowercased())
+    }
+
+    private static func hiddenWallpaperPaths() -> Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: UserDefaultsKeys.hiddenWallpaperPaths) ?? [])
+    }
+
+    private static func hideBundledVideo(at url: URL) {
+        var hiddenPaths = hiddenWallpaperPaths()
+        hiddenPaths.insert(url.path)
+        UserDefaults.standard.set(Array(hiddenPaths).sorted(), forKey: UserDefaultsKeys.hiddenWallpaperPaths)
     }
 
     private static func uniqueDestinationURL(for filename: String, in directory: URL) -> URL {
