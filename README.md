@@ -17,7 +17,8 @@ MacScreen 是一个 macOS 动态壁纸 MVP。当前版本使用 **SwiftUI + AppK
 - 构建产物：`.build/MacScreen.app`
 - 视频素材：`Videos/*.mp4`
 - 视频缩略图：`Assets/Thumbnails/*.png`
-- 应用图标：`Assets/AppIcon/MacScreenIcon.icns`
+- 应用图标源：`Assets/AppIcon/icon.png`
+- 应用图标产物：`Assets/AppIcon/MacScreenIcon.icns`
 - 最低系统：macOS 14+
 - 推荐开发环境：macOS 15.3.1 + Xcode 16.4
 
@@ -28,7 +29,7 @@ MacScreen 是一个 macOS 动态壁纸 MVP。当前版本使用 **SwiftUI + AppK
 ├── App/
 │   └── Info.plist                  # App bundle 信息、图标配置、版本号
 ├── Assets/
-│   ├── AppIcon/                    # 由 /Users/user/Downloads/OIP.webp 生成的应用图标
+│   ├── AppIcon/                    # 图标源文件和生成的 .icns
 │   └── Thumbnails/                 # 构建阶段生成的视频第一帧缩略图
 ├── Scripts/
 │   ├── generate-assets.sh          # 生成缩略图和 .icns 图标
@@ -47,7 +48,6 @@ MacScreen 是一个 macOS 动态壁纸 MVP。当前版本使用 **SwiftUI + AppK
 ├── Videos/                         # 本地 mp4 动态壁纸资源
 ├── Makefile                        # 构建、运行、清理
 ├── Package.swift                   # SwiftPM 元数据
-└── Untitled-1.rb                   # 历史崩溃报告文本，不属于业务源码
 ```
 
 ## 基础准备
@@ -88,13 +88,13 @@ agree
 
 4. 准备应用图标
 
-当前图标源文件固定为：
+当前图标源文件为：
 
 ```text
-/Users/user/Downloads/OIP.webp
+Assets/AppIcon/icon.png
 ```
 
-构建时 `Scripts/generate-assets.sh` 会把它转换为 `.icns`。如果后续更换图标，修改脚本里的 `ICON_SRC` 即可。
+构建时 `Scripts/generate-assets.sh` 会居中裁切为方形图标，并转换为 `.icns`。如果后续更换图标，直接替换这个文件即可。
 
 ## 构建和运行
 
@@ -109,6 +109,20 @@ make run
 ```bash
 make build
 ```
+
+打包为内部使用的 DMG：
+
+```bash
+make package
+```
+
+产物位于：
+
+```text
+dist/MacScreen.dmg
+```
+
+`dist/` 是本地生成产物，不提交到 Git。需要给同事安装时，重新执行 `make package` 生成最新 DMG，或把 DMG 上传到 GitLab Release。
 
 清理构建产物：
 
@@ -127,6 +141,34 @@ Scripts/generate-assets.sh
 - 用 `qlmanage` 为每个 mp4 生成第一帧缩略图
 - 用 `sips` 和 `iconutil` 生成 `.icns` 应用图标
 - 把 `Videos`、`Thumbnails`、`MacScreenIcon.icns` 打包进 `.build/MacScreen.app/Contents/Resources`
+
+## 新增壁纸资源
+
+新增资源不需要改 Swift 代码。把新的 `.mp4` 文件放进：
+
+```text
+Videos/
+```
+
+然后重新构建或打包：
+
+```bash
+make build
+# 或
+make package
+```
+
+构建脚本会自动为新视频生成缩略图，并把视频复制进 App bundle。新增后建议把 `Videos/*.mp4` 和生成的 `Assets/Thumbnails/*.png` 一起提交到 Git。
+
+## 内部分发
+
+内部测试可以先直接分发：
+
+```text
+dist/MacScreen.dmg
+```
+
+如果同事打开时被 macOS 提示无法验证开发者，右键 App 选择“打开”通常可以绕过。更正式的公司内部分发建议后续增加 Developer ID 签名和 Apple notarization。
 
 ## 运行策略
 
@@ -173,7 +215,7 @@ redefinition of module 'SwiftBridging'
 /Library/Developer/CommandLineTools/usr/include/swift/bridging.modulemap
 ```
 
-两个文件都声明了 `SwiftBridging`，导致 AppKit/SwiftUI 无法编译。为了先跑通 MVP，曾经临时写过 Objective-C + AppKit 备用版本。Xcode 16.4 安装完成后，项目已切回 SwiftUI 原生版本。
+两个文件都声明了 `SwiftBridging`，导致 AppKit/SwiftUI 无法编译。Xcode 16.4 安装完成后，项目使用 SwiftUI 原生版本构建。
 
 ### 3. Xcode 安装受系统和账号限制
 
@@ -225,19 +267,7 @@ NavigationSplitView
 
 这些都已经移除。现在缩略图在构建阶段生成，App 启动后只加载图片和元数据。
 
-### 7. Objective-C 备用版异常退出
-
-临时 Objective-C 版本曾经崩溃，崩溃栈显示：
-
-```text
-EXC_BAD_ACCESS
-objc_release
-AutoreleasePoolPage::releaseUntil
-```
-
-原因是退出时播放器、通知 observer、App delegate 等对象清理顺序不稳定。后来临时修过对象生命周期，但当前项目已不再保留 Objective-C 业务入口。
-
-### 8. SwiftUI 窗口不显示
+### 7. SwiftUI 窗口不显示
 
 最初 SwiftUI 版本用 `@main AppDelegate` 手动创建 `NSWindow`，编译后进程启动了，但只出现菜单栏，主窗口没有正常显示。
 
