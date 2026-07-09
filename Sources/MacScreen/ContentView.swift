@@ -66,6 +66,32 @@ struct ContentView: View {
                 .disabled(store.isLoading)
             }
 
+            HStack(spacing: 8) {
+                Button(role: .destructive) {
+                    requestDeletion()
+                } label: {
+                    Label(deleteButtonTitle, systemImage: "trash")
+                }
+                .disabled(store.selectedItems.isEmpty || store.isLoading)
+
+                Button {
+                    Task {
+                        await store.restoreBundledVideos()
+                    }
+                } label: {
+                    Label("初始化资源", systemImage: "arrow.clockwise")
+                }
+                .disabled(store.isLoading)
+            }
+            .controlSize(.small)
+
+            if !store.selectedItems.isEmpty {
+                Text("已选择 \(store.selectedItems.count) 个素材，按住 Command 可多选。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
             if let importMessage = store.importMessage {
                 Text(importMessage)
                     .font(.caption)
@@ -150,7 +176,7 @@ struct ContentView: View {
             Button(role: .destructive) {
                 requestDeletion()
             } label: {
-                Label("删除素材", systemImage: "trash")
+                Label(deleteButtonTitle, systemImage: "trash")
             }
             .disabled(store.selectedItems.isEmpty || store.isLoading)
 
@@ -187,6 +213,10 @@ struct ContentView: View {
         store.selectedItems.sorted {
             $0.title.localizedStandardCompare($1.title) == .orderedAscending
         }.first ?? store.selectedItem
+    }
+
+    private var deleteButtonTitle: String {
+        store.selectedItems.count > 1 ? "删除选中(\(store.selectedItems.count))" : "删除素材"
     }
 
     private func requestDeletion() {

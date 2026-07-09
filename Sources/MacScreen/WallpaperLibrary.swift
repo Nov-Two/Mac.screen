@@ -90,6 +90,10 @@ enum WallpaperLibrary {
         }
     }
 
+    static func restoreBundledVideos() {
+        UserDefaults.standard.removeObject(forKey: UserDefaultsKeys.hiddenWallpaperPaths)
+    }
+
     static func isUserVideo(_ url: URL) -> Bool {
         url.standardizedFileURL.path.hasPrefix(userVideoDirectory.standardizedFileURL.path + "/")
     }

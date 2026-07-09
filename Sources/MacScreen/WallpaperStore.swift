@@ -83,6 +83,22 @@ final class WallpaperStore: ObservableObject {
         isLoading = false
     }
 
+    func restoreBundledVideos() async {
+        isLoading = true
+        errorMessage = nil
+        importMessage = nil
+
+        WallpaperLibrary.restoreBundledVideos()
+
+        let loadedItems = await WallpaperLibrary.loadItems()
+        items = loadedItems
+        selectedItem = preferredInitialSelection(from: loadedItems)
+        selectedItems = selectedItem.map { [$0] } ?? []
+        errorMessage = loadedItems.isEmpty ? "没有在素材目录中找到视频文件。" : nil
+        importMessage = "已初始化内置素材。"
+        isLoading = false
+    }
+
     private func preferredInitialSelection(from items: [WallpaperItem]) -> WallpaperItem? {
         guard !items.isEmpty else { return nil }
 
