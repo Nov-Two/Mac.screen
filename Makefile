@@ -5,6 +5,8 @@ DIST_DIR := dist
 DMG_ROOT := $(DIST_DIR)/dmg-root
 DMG_PATH := $(DIST_DIR)/$(APP_NAME).dmg
 SWIFT_SOURCES := $(shell find Sources/MacScreen -name '*.swift' | sort)
+SIGN_IDENTITY ?= -
+CODESIGN_FLAGS ?= --timestamp=none
 
 .PHONY: build run package clean
 
@@ -33,6 +35,7 @@ build:
 			$(SWIFT_SOURCES) \
 			-o $(APP_BUNDLE)/Contents/MacOS/$(APP_NAME); \
 	fi
+	@codesign --force --deep --sign "$(SIGN_IDENTITY)" $(CODESIGN_FLAGS) $(APP_BUNDLE)
 
 run: build
 	open $(APP_BUNDLE)

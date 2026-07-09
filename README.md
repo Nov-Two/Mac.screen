@@ -141,6 +141,7 @@ Scripts/generate-assets.sh
 - 用 `sips` 和 `iconutil` 生成 `.icns` 应用图标
 - 把 `Videos`、`Thumbnails`、`MacScreenIcon.icns` 打包进 `.build/MacScreen.app/Contents/Resources`
 - 清理没有对应视频的过期缩略图
+- 使用 ad-hoc 签名处理 `.app` 包，降低 GitHub 下载后被 macOS 判定为损坏的概率
 
 ## 新增壁纸资源
 
@@ -192,7 +193,27 @@ make package
 
 当前 DMG 体积主要来自内置视频资源。`Videos/` 约 260MB，而 DMG 已经使用压缩格式生成；要明显减小安装包，需要减少内置视频数量，或改成轻量 App 加用户自行导入/在线下载资源。
 
-如果同事打开时被 macOS 提示无法验证开发者，右键 App 选择“打开”通常可以绕过。更正式的公司内部分发建议后续增加 Developer ID 签名和 Apple notarization。
+当前内部版本默认使用 ad-hoc 签名，不是 Apple Developer ID 签名，也没有 notarization。如果同事从 GitHub 下载后仍被 macOS Gatekeeper 拦截，可以右键 App 选择“打开”，或在终端对安装后的 App 执行：
+
+```bash
+xattr -dr com.apple.quarantine /Applications/MacScreen.app
+```
+
+要让下载后完全像正式软件一样直接打开，需要 Developer ID 签名和 Apple notarization。GitHub Actions 已经预留自动签名公证流程；在仓库 Secrets 配好下面这些值后，推送 tag 会自动生成已签名并公证的 DMG：
+
+```text
+DEVELOPER_ID_CERTIFICATE_BASE64
+DEVELOPER_ID_CERTIFICATE_PASSWORD
+DEVELOPER_ID_APPLICATION_IDENTITY
+BUILD_KEYCHAIN_PASSWORD
+APPLE_ID
+APPLE_TEAM_ID
+APPLE_APP_PASSWORD
+```
+
+其中 `DEVELOPER_ID_CERTIFICATE_BASE64` 是 Developer ID Application `.p12` 证书的 base64 内容，`APPLE_APP_PASSWORD` 是 Apple ID app-specific password。
+
+如果同事打开时被 macOS 提示无法验证开发者，右键 App 选择“打开”通常可以绕过。
 
 ## 运行策略
 
