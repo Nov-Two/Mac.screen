@@ -3,7 +3,9 @@ import AVFoundation
 import Foundation
 
 enum WallpaperLibrary {
-    static var defaultVideoDirectory: URL {
+    private static let supportedVideoExtensions: Set<String> = ["mp4", "mov", "m4v"]
+
+    static var bundledVideoDirectory: URL {
         let candidates = [
             Bundle.main.resourceURL?.appendingPathComponent("Videos", isDirectory: true),
             URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("Videos", isDirectory: true),
@@ -15,7 +17,54 @@ enum WallpaperLibrary {
         } ?? candidates[0]
     }
 
-    static func loadItems(from directory: URL = defaultVideoDirectory) async -> [WallpaperItem] {
+    static var userVideoDirectory: URL {
+        let supportDirectory = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support", isDirectory: true)
+
+        return supportDirectory
+            .appendingPathComponent("MacScreen", isDirectory: true)
+            .appendingPathComponent("Videos", isDirectory: true)
+    }
+
+    static func loadItems() async -> [WallpaperItem] {
+        var seenPaths = Set<String>()
+        var allItems: [WallpaperItem] = []
+
+        for directory in [bundledVideoDirectory, userVideoDirectory] {
+            let items = await loadItems(from: directory)
+            for item in items where seenPaths.insert(item.url.path).inserted {
+                allItems.append(item)
+            }
+        }
+
+        return allItems.sorted {
+            $0.title.localizedStandardCompare($1.title) == .orderedAscending
+        }
+    }
+
+    static func importVideos(from sourceURLs: [URL]) throws -> [URL] {
+        let fileManager = FileManager.default
+        try fileManager.createDirectory(
+            at: userVideoDirectory,
+            withIntermediateDirectories: true
+        )
+
+        var importedURLs: [URL] = []
+        for sourceURL in sourceURLs where isSupportedVideo(sourceURL) {
+            let destinationURL = uniqueDestinationURL(
+                for: sourceURL.lastPathComponent,
+                in: userVideoDirectory
+            )
+            try fileManager.copyItem(at: sourceURL, to: destinationURL)
+            importedURLs.append(destinationURL)
+        }
+
+        return importedURLs
+    }
+
+    private static func loadItems(from directory: URL) async -> [WallpaperItem] {
         let fileManager = FileManager.default
         guard
             let urls = try? fileManager.contentsOfDirectory(
@@ -28,7 +77,7 @@ enum WallpaperLibrary {
         }
 
         let videoURLs = urls
-            .filter { $0.pathExtension.lowercased() == "mp4" }
+            .filter(isSupportedVideo)
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
 
         var items: [WallpaperItem] = []
@@ -51,6 +100,26 @@ enum WallpaperLibrary {
         }
 
         return items
+    }
+
+    private static func isSupportedVideo(_ url: URL) -> Bool {
+        supportedVideoExtensions.contains(url.pathExtension.lowercased())
+    }
+
+    private static func uniqueDestinationURL(for filename: String, in directory: URL) -> URL {
+        let fileManager = FileManager.default
+        let sourceURL = URL(fileURLWithPath: filename)
+        let baseName = sourceURL.deletingPathExtension().lastPathComponent
+        let pathExtension = sourceURL.pathExtension.isEmpty ? "mp4" : sourceURL.pathExtension
+
+        var destinationURL = directory.appendingPathComponent("\(baseName).\(pathExtension)")
+        var index = 2
+        while fileManager.fileExists(atPath: destinationURL.path) {
+            destinationURL = directory.appendingPathComponent("\(baseName) \(index).\(pathExtension)")
+            index += 1
+        }
+
+        return destinationURL
     }
 
     private static func durationText(for asset: AVAsset) async -> String {

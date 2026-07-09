@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import UniformTypeIdentifiers
 
 @MainActor
 final class WallpaperStore: ObservableObject {
@@ -6,6 +8,7 @@ final class WallpaperStore: ObservableObject {
     @Published var selectedItem: WallpaperItem?
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
+    @Published private(set) var importMessage: String?
 
     func load() async {
         isLoading = true
@@ -15,6 +18,35 @@ final class WallpaperStore: ObservableObject {
         items = loadedItems
         selectedItem = preferredInitialSelection(from: loadedItems)
         errorMessage = loadedItems.isEmpty ? "没有在素材目录中找到 mp4 文件。" : nil
+        isLoading = false
+    }
+
+    func importVideos() async {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.mpeg4Movie, .quickTimeMovie, .movie]
+        panel.prompt = "导入"
+        panel.message = "选择一个或多个视频作为自定义动态壁纸素材。"
+
+        guard panel.runModal() == .OK else { return }
+
+        isLoading = true
+        errorMessage = nil
+        importMessage = nil
+
+        do {
+            let importedURLs = try WallpaperLibrary.importVideos(from: panel.urls)
+            let loadedItems = await WallpaperLibrary.loadItems()
+            items = loadedItems
+            selectedItem = preferredSelection(afterImporting: importedURLs, from: loadedItems)
+            errorMessage = loadedItems.isEmpty ? "没有在素材目录中找到 mp4 文件。" : nil
+            importMessage = importedURLs.isEmpty ? "没有导入支持的视频文件。" : "已导入 \(importedURLs.count) 个视频。"
+        } catch {
+            errorMessage = "导入失败：\(error.localizedDescription)"
+        }
+
         isLoading = false
     }
 
@@ -29,5 +61,13 @@ final class WallpaperStore: ObservableObject {
         }
 
         return items.first
+    }
+
+    private func preferredSelection(afterImporting importedURLs: [URL], from items: [WallpaperItem]) -> WallpaperItem? {
+        guard let importedURL = importedURLs.first else {
+            return preferredInitialSelection(from: items)
+        }
+
+        return items.first { $0.url == importedURL } ?? preferredInitialSelection(from: items)
     }
 }

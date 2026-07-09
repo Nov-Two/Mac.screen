@@ -144,7 +144,7 @@ Scripts/generate-assets.sh
 
 ## 新增壁纸资源
 
-新增资源不需要改 Swift 代码。把新的 `.mp4` 文件放进：
+新增内置资源不需要改 Swift 代码。把新的 `.mp4` 文件放进：
 
 ```text
 Videos/
@@ -159,6 +159,14 @@ make package
 ```
 
 构建脚本会自动为新视频生成缩略图，并把视频复制进 App bundle。新增后建议把 `Videos/*.mp4` 和生成的 `Assets/Thumbnails/*.png` 一起提交到 Git。
+
+用户也可以在 App 内点击“添加视频”，导入自己的本地视频作为动态壁纸素材。导入的视频会复制到当前用户的 Application Support 目录：
+
+```text
+~/Library/Application Support/MacScreen/Videos/
+```
+
+这类用户自定义素材不会写回代码仓库，也不需要重新打包。当前支持 `mp4`、`mov`、`m4v` 视频文件。
 
 ## 内部分发
 

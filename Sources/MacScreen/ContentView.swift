@@ -42,12 +42,34 @@ struct ContentView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("MacScreen")
-                .font(.title2.weight(.semibold))
-            Text("本地动态壁纸")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("MacScreen")
+                        .font(.title2.weight(.semibold))
+                    Text("本地动态壁纸")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Button {
+                    Task {
+                        await store.importVideos()
+                    }
+                } label: {
+                    Label("添加视频", systemImage: "plus")
+                }
+                .disabled(store.isLoading)
+            }
+
+            if let importMessage = store.importMessage {
+                Text(importMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)
