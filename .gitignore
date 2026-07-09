@@ -2,6 +2,10 @@
 .swiftpm/
 dist/
 .DS_Store
+Assets/AppIcon/MacScreenIcon.icns
+Assets/AppIcon/MacScreenIcon.iconset/
+Assets/AppIcon/source-1024.png
+Assets/Thumbnails/
 DerivedData/
 *.xcuserdata/
 *.xcodeproj/project.xcworkspace/xcuserdata/

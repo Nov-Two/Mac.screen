@@ -11,9 +11,17 @@ ICON_PNG="$ICON_DIR/source-1024.png"
 ICON_ICNS="$ICON_DIR/MacScreenIcon.icns"
 
 mkdir -p "$THUMB_DIR" "$ICON_DIR"
+shopt -s nullglob
 
-for video in "$VIDEO_DIR"/*.mp4; do
-  [[ -e "$video" ]] || continue
+for thumb in "$THUMB_DIR"/*.png; do
+  video_name="$(basename "${thumb%.png}")"
+  if [[ ! -f "$VIDEO_DIR/$video_name" ]]; then
+    rm -f "$thumb"
+  fi
+done
+
+videos=("$VIDEO_DIR"/*.mp4 "$VIDEO_DIR"/*.mov "$VIDEO_DIR"/*.m4v)
+for video in "${videos[@]}"; do
   name="$(basename "$video").png"
   thumb="$THUMB_DIR/$name"
 

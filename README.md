@@ -16,9 +16,9 @@ MacScreen 是一个 macOS 动态壁纸 MVP。当前版本使用 **SwiftUI + AppK
 - 运行方式：`make run`
 - 构建产物：`.build/MacScreen.app`
 - 视频素材：`Videos/*.mp4`
-- 视频缩略图：`Assets/Thumbnails/*.png`
+- 视频缩略图：构建阶段生成到 `Assets/Thumbnails/`
 - 应用图标源：`Assets/AppIcon/icon.png`
-- 应用图标产物：`Assets/AppIcon/MacScreenIcon.icns`
+- 应用图标产物：构建阶段生成 `Assets/AppIcon/MacScreenIcon.icns`
 - 最低系统：macOS 14+
 - 推荐开发环境：macOS 15.3.1 + Xcode 16.4
 
@@ -29,8 +29,7 @@ MacScreen 是一个 macOS 动态壁纸 MVP。当前版本使用 **SwiftUI + AppK
 ├── App/
 │   └── Info.plist                  # App bundle 信息、图标配置、版本号
 ├── Assets/
-│   ├── AppIcon/                    # 图标源文件和生成的 .icns
-│   └── Thumbnails/                 # 构建阶段生成的视频第一帧缩略图
+│   └── AppIcon/                    # 图标源文件 icon.png
 ├── Scripts/
 │   ├── generate-assets.sh          # 生成缩略图和 .icns 图标
 │   └── install-xcode-16.4.sh       # 安装 Xcode 16.4 的辅助脚本
@@ -141,6 +140,7 @@ Scripts/generate-assets.sh
 - 用 `qlmanage` 为每个 mp4 生成第一帧缩略图
 - 用 `sips` 和 `iconutil` 生成 `.icns` 应用图标
 - 把 `Videos`、`Thumbnails`、`MacScreenIcon.icns` 打包进 `.build/MacScreen.app/Contents/Resources`
+- 清理没有对应视频的过期缩略图
 
 ## 新增壁纸资源
 
@@ -158,7 +158,7 @@ make build
 make package
 ```
 
-构建脚本会自动为新视频生成缩略图，并把视频复制进 App bundle。新增后建议把 `Videos/*.mp4` 和生成的 `Assets/Thumbnails/*.png` 一起提交到 Git。
+构建脚本会自动为新视频生成缩略图，并把视频复制进 App bundle。新增后只需要把 `Videos/*.mp4` 提交到 Git；`Assets/Thumbnails/` 是生成物，不需要提交。
 
 用户也可以在 App 内点击“添加视频”，导入自己的本地视频作为动态壁纸素材。导入的视频会复制到当前用户的 Application Support 目录：
 
@@ -345,8 +345,8 @@ call to main actor-isolated initializer 'init()' in a synchronous nonisolated co
 例如：
 
 ```text
-Videos/090F9225-...mp4
-Assets/Thumbnails/090F9225-...mp4.png
+Videos/示例壁纸.mp4
+Assets/Thumbnails/示例壁纸.mp4.png
 ```
 
 运行时优先读取 App bundle 中的 `Resources/Thumbnails`。如果读取失败，当前代码还有一个运行时兜底抽帧逻辑，但维护时应尽量保证构建阶段生成好缩略图，避免启动阶段解码视频。

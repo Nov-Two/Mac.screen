@@ -2,6 +2,7 @@
 
 ## 2026-07-09
 
+- Slimmed the repository by keeping generated thumbnails and app icon outputs out of source control.
 - Added batch deletion and optional delete-confirmation suppression.
 - Added selected wallpaper deletion for both imported videos and bundled defaults.
 - Added in-app local video import for custom dynamic wallpaper resources.
