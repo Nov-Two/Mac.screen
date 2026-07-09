@@ -5,6 +5,13 @@ import Foundation
 enum WallpaperLibrary {
     private static let supportedVideoExtensions: Set<String> = ["mp4", "mov", "m4v"]
     private static let supportedArchiveExtensions: Set<String> = ["zip"]
+    private static let minimumImportedVideoWidth = 1920
+    private static let minimumImportedVideoHeight = 1080
+
+    struct ImportResult {
+        let importedURLs: [URL]
+        let rejectedLowResolutionFilenames: [String]
+    }
 
     static var bundledVideoDirectory: URL {
         let candidates = [
@@ -46,7 +53,7 @@ enum WallpaperLibrary {
         }
     }
 
-    static func importVideos(from sourceURLs: [URL]) throws -> [URL] {
+    static func importVideos(from sourceURLs: [URL]) async throws -> ImportResult {
         let fileManager = FileManager.default
         try fileManager.createDirectory(
             at: userVideoDirectory,
@@ -54,7 +61,13 @@ enum WallpaperLibrary {
         )
 
         var importedURLs: [URL] = []
+        var rejectedLowResolutionFilenames: [String] = []
         for sourceURL in sourceURLs where isSupportedVideo(sourceURL) {
+            guard await isHighEnoughResolution(sourceURL) else {
+                rejectedLowResolutionFilenames.append(sourceURL.lastPathComponent)
+                continue
+            }
+
             let destinationURL = uniqueDestinationURL(
                 for: sourceURL.lastPathComponent,
                 in: userVideoDirectory
@@ -63,21 +76,32 @@ enum WallpaperLibrary {
             importedURLs.append(destinationURL)
         }
 
-        return importedURLs
+        return ImportResult(
+            importedURLs: importedURLs,
+            rejectedLowResolutionFilenames: rejectedLowResolutionFilenames
+        )
     }
 
-    static func importResources(from sourceURLs: [URL]) throws -> [URL] {
+    static func importResources(from sourceURLs: [URL]) async throws -> ImportResult {
         var importedURLs: [URL] = []
+        var rejectedLowResolutionFilenames: [String] = []
 
         for sourceURL in sourceURLs {
             if isSupportedVideo(sourceURL) {
-                importedURLs.append(contentsOf: try importVideos(from: [sourceURL]))
+                let result = try await importVideos(from: [sourceURL])
+                importedURLs.append(contentsOf: result.importedURLs)
+                rejectedLowResolutionFilenames.append(contentsOf: result.rejectedLowResolutionFilenames)
             } else if isSupportedArchive(sourceURL) {
-                importedURLs.append(contentsOf: try importVideosFromArchive(sourceURL))
+                let result = try await importVideosFromArchive(sourceURL)
+                importedURLs.append(contentsOf: result.importedURLs)
+                rejectedLowResolutionFilenames.append(contentsOf: result.rejectedLowResolutionFilenames)
             }
         }
 
-        return importedURLs
+        return ImportResult(
+            importedURLs: importedURLs,
+            rejectedLowResolutionFilenames: rejectedLowResolutionFilenames
+        )
     }
 
     static func deleteVideos(at urls: [URL]) throws -> String {
@@ -159,7 +183,7 @@ enum WallpaperLibrary {
         supportedArchiveExtensions.contains(url.pathExtension.lowercased())
     }
 
-    private static func importVideosFromArchive(_ archiveURL: URL) throws -> [URL] {
+    private static func importVideosFromArchive(_ archiveURL: URL) async throws -> ImportResult {
         let fileManager = FileManager.default
         let extractionDirectory = fileManager.temporaryDirectory
             .appendingPathComponent("MacScreenArchiveImport", isDirectory: true)
@@ -182,11 +206,11 @@ enum WallpaperLibrary {
         process.waitUntilExit()
 
         guard process.terminationStatus == 0 else {
-            return []
+            return ImportResult(importedURLs: [], rejectedLowResolutionFilenames: [])
         }
 
         let videoURLs = recursiveFiles(in: extractionDirectory).filter(isSupportedVideo)
-        return try importVideos(from: videoURLs)
+        return try await importVideos(from: videoURLs)
     }
 
     private static func recursiveFiles(in directory: URL) -> [URL] {
@@ -256,6 +280,29 @@ enum WallpaperLibrary {
             return "\(width)x\(height)"
         } catch {
             return "--"
+        }
+    }
+
+    private static func isHighEnoughResolution(_ url: URL) async -> Bool {
+        guard let resolution = await videoResolution(for: AVURLAsset(url: url)) else {
+            return false
+        }
+
+        return resolution.width >= minimumImportedVideoWidth && resolution.height >= minimumImportedVideoHeight
+    }
+
+    private static func videoResolution(for asset: AVAsset) async -> (width: Int, height: Int)? {
+        do {
+            let tracks = try await asset.loadTracks(withMediaType: .video)
+            guard let track = tracks.first else { return nil }
+            let naturalSize = try await track.load(.naturalSize)
+            let transform = try await track.load(.preferredTransform)
+            let transformed = naturalSize.applying(transform)
+            let width = Int(abs(transformed.width).rounded())
+            let height = Int(abs(transformed.height).rounded())
+            return (width, height)
+        } catch {
+            return nil
         }
     }
 
