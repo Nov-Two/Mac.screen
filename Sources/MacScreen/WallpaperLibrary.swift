@@ -4,6 +4,7 @@ import Foundation
 
 enum WallpaperLibrary {
     private static let supportedVideoExtensions: Set<String> = ["mp4", "mov", "m4v"]
+    private static let supportedArchiveExtensions: Set<String> = ["zip"]
 
     static var bundledVideoDirectory: URL {
         let candidates = [
@@ -60,6 +61,20 @@ enum WallpaperLibrary {
             )
             try fileManager.copyItem(at: sourceURL, to: destinationURL)
             importedURLs.append(destinationURL)
+        }
+
+        return importedURLs
+    }
+
+    static func importResources(from sourceURLs: [URL]) throws -> [URL] {
+        var importedURLs: [URL] = []
+
+        for sourceURL in sourceURLs {
+            if isSupportedVideo(sourceURL) {
+                importedURLs.append(contentsOf: try importVideos(from: [sourceURL]))
+            } else if isSupportedArchive(sourceURL) {
+                importedURLs.append(contentsOf: try importVideosFromArchive(sourceURL))
+            }
         }
 
         return importedURLs
@@ -138,6 +153,58 @@ enum WallpaperLibrary {
 
     private static func isSupportedVideo(_ url: URL) -> Bool {
         supportedVideoExtensions.contains(url.pathExtension.lowercased())
+    }
+
+    private static func isSupportedArchive(_ url: URL) -> Bool {
+        supportedArchiveExtensions.contains(url.pathExtension.lowercased())
+    }
+
+    private static func importVideosFromArchive(_ archiveURL: URL) throws -> [URL] {
+        let fileManager = FileManager.default
+        let extractionDirectory = fileManager.temporaryDirectory
+            .appendingPathComponent("MacScreenArchiveImport", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+
+        try fileManager.createDirectory(
+            at: extractionDirectory,
+            withIntermediateDirectories: true
+        )
+
+        defer {
+            try? fileManager.removeItem(at: extractionDirectory)
+        }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        process.arguments = ["-x", "-k", archiveURL.path, extractionDirectory.path]
+
+        try process.run()
+        process.waitUntilExit()
+
+        guard process.terminationStatus == 0 else {
+            return []
+        }
+
+        let videoURLs = recursiveFiles(in: extractionDirectory).filter(isSupportedVideo)
+        return try importVideos(from: videoURLs)
+    }
+
+    private static func recursiveFiles(in directory: URL) -> [URL] {
+        guard
+            let enumerator = FileManager.default.enumerator(
+                at: directory,
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            )
+        else {
+            return []
+        }
+
+        return enumerator
+            .compactMap { $0 as? URL }
+            .filter { url in
+                (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+            }
     }
 
     private static func hiddenWallpaperPaths() -> Set<String> {

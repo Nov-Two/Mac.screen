@@ -53,6 +53,26 @@ final class WallpaperStore: ObservableObject {
         isLoading = false
     }
 
+    func importDownloadedResource(at url: URL) async {
+        isLoading = true
+        errorMessage = nil
+        importMessage = nil
+
+        do {
+            let importedURLs = try WallpaperLibrary.importResources(from: [url])
+            let loadedItems = await WallpaperLibrary.loadItems()
+            items = loadedItems
+            selectedItem = preferredSelection(afterImporting: importedURLs, from: loadedItems)
+            selectedItems = selectedItem.map { [$0] } ?? []
+            errorMessage = loadedItems.isEmpty ? "没有在素材目录中找到视频文件。" : nil
+            importMessage = importedURLs.isEmpty ? "下载完成，但没有找到支持的视频文件。" : "下载完成，已自动导入 \(importedURLs.count) 个视频。"
+        } catch {
+            errorMessage = "自动导入下载资源失败：\(error.localizedDescription)"
+        }
+
+        isLoading = false
+    }
+
     func delete(_ itemsToDelete: Set<WallpaperItem>) async {
         guard !itemsToDelete.isEmpty else { return }
 

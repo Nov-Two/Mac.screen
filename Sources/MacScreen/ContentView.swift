@@ -117,7 +117,21 @@ struct ContentView: View {
         HStack(spacing: 4) {
             Text("更多精美壁纸请前往")
                 .foregroundStyle(.secondary)
-            Link("haowallpaper.com", destination: URL(string: "https://haowallpaper.com/")!)
+            Button {
+                InAppBrowserWindowController.shared.show(
+                    url: URL(string: "https://haowallpaper.com/")!,
+                    title: "haowallpaper.com"
+                ) { downloadedURL in
+                    Task {
+                        await store.importDownloadedResource(at: downloadedURL)
+                    }
+                }
+            } label: {
+                Text("haowallpaper.com")
+                    .underline()
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.link)
             Text("下载")
                 .foregroundStyle(.secondary)
             Spacer()
