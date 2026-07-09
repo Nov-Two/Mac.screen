@@ -5,6 +5,7 @@ struct MacScreenApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var store = WallpaperStore()
     @StateObject private var wallpaperController = WallpaperWindowController()
+    private let softwareUpdateController = SoftwareUpdateController()
 
     var body: some Scene {
         WindowGroup("MacScreen") {
@@ -19,5 +20,10 @@ struct MacScreenApp: App {
             }
         }
         .windowResizability(.contentMinSize)
+        .commands {
+            CommandGroup(after: .appInfo) {
+                CheckForUpdatesView(updateController: softwareUpdateController)
+            }
+        }
     }
 }
