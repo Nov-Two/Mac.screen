@@ -13,3 +13,4 @@
 - Switched app icon generation to the project-local `Assets/AppIcon/icon.png`.
 - Cleaned project structure by removing the historical crash report from source control scope.
 - Kept generated build artifacts such as `.build/` and `dist/` out of Git.
+- add new version
