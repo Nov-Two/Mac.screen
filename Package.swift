@@ -20,6 +20,11 @@ let package = Package(
                 .product(name: "Sparkle", package: "Sparkle")
             ],
             path: "Sources/MacScreen"
+        ),
+        .testTarget(
+            name: "MacScreenTests",
+            dependencies: ["MacScreen"],
+            path: "Tests/MacScreenTests"
         )
     ]
 )
