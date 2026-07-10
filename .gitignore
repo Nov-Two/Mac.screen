@@ -11,3 +11,4 @@ DerivedData/
 *.xcuserdata/
 *.xcodeproj/project.xcworkspace/xcuserdata/
 *.app/
+.superpowers/

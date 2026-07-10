@@ -5,6 +5,7 @@ struct ContentView: View {
     @ObservedObject var store: WallpaperStore
     @ObservedObject var wallpaperController: WallpaperWindowController
     @State private var skipsDeleteConfirmation = UserDefaults.standard.bool(forKey: UserDefaultsKeys.skipsDeleteConfirmation)
+    @State private var enablesWallpaperCardHoverEffect = UserDefaults.standard.object(forKey: UserDefaultsKeys.enablesWallpaperCardHoverEffect) as? Bool ?? true
     @State private var searchText = ""
     @State private var selectedCategory = "全部"
     @State private var hoveredItemID: URL?
@@ -22,6 +23,9 @@ struct ContentView: View {
         }
         .frame(minWidth: 980, minHeight: 600)
         .background(AppTheme.background)
+        .onChange(of: enablesWallpaperCardHoverEffect) { _, enabled in
+            UserDefaults.standard.set(enabled, forKey: UserDefaultsKeys.enablesWallpaperCardHoverEffect)
+        }
         .task {
             await store.load()
             restoreLastWallpaperIfNeeded()
@@ -68,6 +72,13 @@ struct ContentView: View {
                 }
             }
             .disabled(store.isLoading)
+
+            ToolbarToggleButton(
+                systemImage: "sparkles",
+                title: "动态效果",
+                help: "控制素材卡片的 3D hover 动效。关闭后会停用连续鼠标跟踪，减轻卡顿。",
+                isOn: $enablesWallpaperCardHoverEffect
+            )
 
             ToolbarIconButton(
                 systemImage: "trash",
@@ -146,6 +157,7 @@ struct ContentView: View {
                                 isActive: wallpaperController.activeURL == item.url,
                                 isFavorite: store.isFavorite(item),
                                 isHovering: hoveredItemID == item.id,
+                                isMotionEnabled: enablesWallpaperCardHoverEffect,
                                 width: cardWidth,
                                 height: cardHeight,
                                 onSelect: {
@@ -448,12 +460,17 @@ private struct WallpaperCard: View {
     let isActive: Bool
     let isFavorite: Bool
     let isHovering: Bool
+    let isMotionEnabled: Bool
     let width: CGFloat
     let height: CGFloat
     let onSelect: () -> Void
     let onApply: () -> Void
     let onFavorite: () -> Void
     let onHover: (Bool) -> Void
+    @State private var hoverMotion = WallpaperCardHoverState.idle
+    @State private var isTrackingHover = false
+
+    private let hoverConfiguration = AppConfiguration.wallpaperCardHover
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -485,12 +502,47 @@ private struct WallpaperCard: View {
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .onTapGesture(perform: onSelect)
         .pointingHandCursor()
-        .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.15)) {
-                onHover(hovering)
+        .rotation3DEffect(
+            .degrees(isMotionEnabled ? hoverMotion.rotateX : 0),
+            axis: (x: 1, y: 0, z: 0),
+            perspective: hoverConfiguration.perspective
+        )
+        .rotation3DEffect(
+            .degrees(isMotionEnabled ? hoverMotion.rotateY : 0),
+            axis: (x: 0, y: 1, z: 0),
+            perspective: hoverConfiguration.perspective
+        )
+        .scaleEffect(isMotionEnabled ? hoverMotion.scale : 1)
+        .offset(
+            x: isMotionEnabled ? hoverMotion.offset.width : 0,
+            y: isMotionEnabled ? hoverMotion.offset.height : 0
+        )
+        .modifier(
+            WallpaperCardHoverInteractionModifier(
+                isMotionEnabled: isMotionEnabled,
+                cardSize: CGSize(width: width, height: height),
+                hoverConfiguration: hoverConfiguration,
+                hoverMotion: $hoverMotion,
+                isTrackingHover: $isTrackingHover,
+                onHover: onHover
+            )
+        )
+        .onChange(of: isMotionEnabled) { _, enabled in
+            guard !enabled else { return }
+            hoverMotion = .idle
+        }
+        .onDisappear {
+            if isTrackingHover {
+                isTrackingHover = false
+                onHover(false)
             }
         }
-        .shadow(color: .black.opacity(isHovering ? 0.16 : 0.08), radius: isHovering ? 14 : 8, x: 0, y: 6)
+        .shadow(
+            color: .black.opacity(shadowOpacity),
+            radius: shadowRadius,
+            x: 0,
+            y: hoverConfiguration.shadowYOffset + hoverMotion.strength * hoverConfiguration.shadowHoverLift
+        )
     }
 
     private var thumbnail: some View {
@@ -502,11 +554,31 @@ private struct WallpaperCard: View {
                     .resizable()
                     .scaledToFill()
                     .frame(width: width, height: height)
+                    .scaleEffect(isMotionEnabled ? hoverMotion.mediaScale : AppConfiguration.wallpaperCardHover.baseMediaScale)
+                    .offset(
+                        x: isMotionEnabled ? hoverMotion.mediaOffset.width : 0,
+                        y: isMotionEnabled ? hoverMotion.mediaOffset.height : 0
+                    )
                     .clipped()
             } else {
                 Image(systemName: "film")
                     .font(.system(size: 32))
                     .foregroundStyle(.secondary)
+            }
+
+            if isMotionEnabled && hoverConfiguration.isHighlightEnabled && isHovering {
+                RadialGradient(
+                    colors: [
+                        .white.opacity(hoverMotion.highlightOpacity),
+                        .white.opacity(hoverMotion.highlightOpacity * 0.36),
+                        .clear
+                    ],
+                    center: hoverMotion.highlightCenter,
+                    startRadius: 6,
+                    endRadius: max(width, height) * 0.9
+                )
+                .blendMode(.screen)
+                .allowsHitTesting(false)
             }
         }
     }
@@ -572,10 +644,18 @@ private struct WallpaperCard: View {
                     .pointingHandCursor()
                 }
                 .frame(width: 72, height: 26, alignment: .trailing)
+                .offset(
+                    x: isMotionEnabled ? hoverMotion.actionsOffset.width : 0,
+                    y: isMotionEnabled ? hoverMotion.actionsOffset.height : 0
+                )
             }
             .frame(width: width - 24, alignment: .bottomLeading)
             .padding(.horizontal, 12)
             .padding(.bottom, 11)
+            .offset(
+                x: isMotionEnabled ? hoverMotion.contentOffset.width : 0,
+                y: isMotionEnabled ? hoverMotion.contentOffset.height : 0
+            )
         }
     }
 
@@ -602,6 +682,16 @@ private struct WallpaperCard: View {
         return .white.opacity(isHovering ? 0.7 : 0.24)
     }
 
+    private var shadowOpacity: CGFloat {
+        hoverConfiguration.idleShadowOpacity
+            + (hoverConfiguration.hoverShadowOpacity - hoverConfiguration.idleShadowOpacity) * hoverMotion.strength
+    }
+
+    private var shadowRadius: CGFloat {
+        hoverConfiguration.idleShadowRadius
+            + (hoverConfiguration.hoverShadowRadius - hoverConfiguration.idleShadowRadius) * hoverMotion.strength
+    }
+
     private func metadata(_ text: String, _ icon: String) -> some View {
         Label(text, systemImage: icon)
             .font(.system(size: 11, weight: .medium))
@@ -609,6 +699,163 @@ private struct WallpaperCard: View {
             .lineLimit(1)
             .truncationMode(.tail)
             .fixedSize(horizontal: true, vertical: false)
+    }
+}
+
+private struct WallpaperCardHoverState: Equatable {
+    let rotateX: CGFloat
+    let rotateY: CGFloat
+    let scale: CGFloat
+    let strength: CGFloat
+    let offset: CGSize
+    let mediaScale: CGFloat
+    let mediaOffset: CGSize
+    let contentOffset: CGSize
+    let actionsOffset: CGSize
+    let highlightCenter: UnitPoint
+    let highlightOpacity: CGFloat
+
+    static let idle = WallpaperCardHoverState(
+        rotateX: 0,
+        rotateY: 0,
+        scale: 1,
+        strength: 0,
+        offset: .zero,
+        mediaScale: AppConfiguration.wallpaperCardHover.baseMediaScale,
+        mediaOffset: .zero,
+        contentOffset: .zero,
+        actionsOffset: .zero,
+        highlightCenter: .center,
+        highlightOpacity: 0
+    )
+
+    init(
+        rotateX: CGFloat,
+        rotateY: CGFloat,
+        scale: CGFloat,
+        strength: CGFloat,
+        offset: CGSize,
+        mediaScale: CGFloat,
+        mediaOffset: CGSize,
+        contentOffset: CGSize,
+        actionsOffset: CGSize,
+        highlightCenter: UnitPoint,
+        highlightOpacity: CGFloat
+    ) {
+        self.rotateX = rotateX
+        self.rotateY = rotateY
+        self.scale = scale
+        self.strength = strength
+        self.offset = offset
+        self.mediaScale = mediaScale
+        self.mediaOffset = mediaOffset
+        self.contentOffset = contentOffset
+        self.actionsOffset = actionsOffset
+        self.highlightCenter = highlightCenter
+        self.highlightOpacity = highlightOpacity
+    }
+
+    init(location: CGPoint, size: CGSize, configuration: WallpaperCardHoverConfiguration) {
+        let width = max(size.width, 1)
+        let height = max(size.height, 1)
+        let normalizedX = Self.clamp(location.x / width, min: 0, max: 1)
+        let normalizedY = Self.clamp(location.y / height, min: 0, max: 1)
+
+        let centeredX = Self.applyDeadZone((normalizedX * 2) - 1, deadZone: configuration.deadZone)
+        let centeredY = Self.applyDeadZone((normalizedY * 2) - 1, deadZone: configuration.deadZone)
+        let strength = min(1, sqrt(centeredX * centeredX + centeredY * centeredY))
+
+        let offset = CGSize(
+            width: centeredX * configuration.maxOffsetX,
+            height: centeredY * configuration.maxOffsetY
+        )
+
+        self.init(
+            rotateX: -centeredY * configuration.maxTiltDegrees,
+            rotateY: centeredX * configuration.maxTiltDegrees,
+            scale: 1 + configuration.maxScaleIncrease * strength,
+            strength: strength,
+            offset: offset,
+            mediaScale: configuration.baseMediaScale + configuration.maxMediaScaleIncrease * strength,
+            mediaOffset: CGSize(
+                width: offset.width * configuration.mediaOffsetMultiplier,
+                height: offset.height * configuration.mediaOffsetMultiplier
+            ),
+            contentOffset: CGSize(
+                width: offset.width * configuration.contentOffsetMultiplier,
+                height: offset.height * configuration.contentOffsetMultiplier
+            ),
+            actionsOffset: CGSize(
+                width: offset.width * configuration.actionsOffsetMultiplier,
+                height: offset.height * configuration.actionsOffsetMultiplier
+            ),
+            highlightCenter: UnitPoint(x: normalizedX, y: normalizedY),
+            highlightOpacity: configuration.highlightBaseOpacity
+                + (configuration.highlightMaxOpacity - configuration.highlightBaseOpacity) * strength
+        )
+    }
+
+    private static func applyDeadZone(_ value: CGFloat, deadZone: CGFloat) -> CGFloat {
+        let magnitude = abs(value)
+        guard magnitude > deadZone else { return 0 }
+        return value.sign == .minus
+            ? -((magnitude - deadZone) / (1 - deadZone))
+            : (magnitude - deadZone) / (1 - deadZone)
+    }
+
+    private static func clamp(_ value: CGFloat, min: CGFloat, max: CGFloat) -> CGFloat {
+        Swift.max(min, Swift.min(max, value))
+    }
+}
+
+private struct WallpaperCardHoverInteractionModifier: ViewModifier {
+    let isMotionEnabled: Bool
+    let cardSize: CGSize
+    let hoverConfiguration: WallpaperCardHoverConfiguration
+    @Binding var hoverMotion: WallpaperCardHoverState
+    @Binding var isTrackingHover: Bool
+    let onHover: (Bool) -> Void
+
+    func body(content: Content) -> some View {
+        if isMotionEnabled {
+            content.onContinuousHover(coordinateSpace: .local) { phase in
+                switch phase {
+                case .active(let location):
+                    if !isTrackingHover {
+                        isTrackingHover = true
+                        onHover(true)
+                    }
+                    hoverMotion = WallpaperCardHoverState(
+                        location: location,
+                        size: cardSize,
+                        configuration: hoverConfiguration
+                    )
+                case .ended:
+                    endHover(resetMotion: true)
+                }
+            }
+        } else {
+            content.onHover { hovering in
+                if hovering {
+                    guard !isTrackingHover else { return }
+                    isTrackingHover = true
+                    onHover(true)
+                } else {
+                    endHover(resetMotion: false)
+                }
+            }
+        }
+    }
+
+    private func endHover(resetMotion: Bool) {
+        guard isTrackingHover else { return }
+        isTrackingHover = false
+        onHover(false)
+
+        guard resetMotion else { return }
+        withAnimation(.easeOut(duration: hoverConfiguration.resetAnimationDuration)) {
+            hoverMotion = .idle
+        }
     }
 }
 
@@ -678,6 +925,41 @@ private struct ToolbarIconButton: View {
         }
 
         return isActive ? .accentColor : .primary
+    }
+}
+
+private struct ToolbarToggleButton: View {
+    let systemImage: String
+    let title: String
+    let help: String
+    @Binding var isOn: Bool
+    @State private var isHovering = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Label(title, systemImage: systemImage)
+                .font(.system(size: 13, weight: .medium))
+                .labelStyle(.titleAndIcon)
+
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .scaleEffect(0.8)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(background, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .help(help)
+        .pointingHandCursor()
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.12)) {
+                isHovering = hovering
+            }
+        }
+    }
+
+    private var background: Color {
+        Color(nsColor: .controlBackgroundColor).opacity(isHovering ? 1 : 0.78)
     }
 }
 
