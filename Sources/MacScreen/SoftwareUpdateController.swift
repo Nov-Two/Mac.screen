@@ -74,6 +74,7 @@ struct CheckForUpdatesView: View {
             updateController.checkForUpdates()
         }
         .disabled(!viewModel.canCheckForUpdates)
+        .pointingHandCursor()
     }
 }
 
