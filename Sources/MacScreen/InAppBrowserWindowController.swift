@@ -2,7 +2,7 @@ import AppKit
 import WebKit
 
 @MainActor
-final class InAppBrowserWindowController: NSObject, NSWindowDelegate, WKUIDelegate, WKNavigationDelegate, WKDownloadDelegate {
+final class InAppBrowserWindowController: NSObject, NSWindowDelegate, WKUIDelegate, WKNavigationDelegate, WKDownloadDelegate, NSTextFieldDelegate {
     static let shared = InAppBrowserWindowController()
 
     private var windowController: NSWindowController?
@@ -11,6 +11,8 @@ final class InAppBrowserWindowController: NSObject, NSWindowDelegate, WKUIDelega
     private weak var forwardButton: NSButton?
     private weak var reloadButton: NSButton?
     private weak var addressField: NSTextField?
+    private var urlObservation: NSKeyValueObservation?
+    private var titleObservation: NSKeyValueObservation?
     private var downloadDestinations: [ObjectIdentifier: URL] = [:]
     private var pendingRequestID: UUID?
     private var onDownloadedResource: ((URL) -> Void)?
@@ -38,6 +40,7 @@ final class InAppBrowserWindowController: NSObject, NSWindowDelegate, WKUIDelega
         configuration.allowsAirPlayForMediaPlayback = false
         configuration.websiteDataStore = .nonPersistent()
         configuration.processPool = WKProcessPool()
+        configuration.userContentController.addUserScript(Self.pointerCursorScript)
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.uiDelegate = self
@@ -46,7 +49,12 @@ final class InAppBrowserWindowController: NSObject, NSWindowDelegate, WKUIDelega
         webView.load(URLRequest(url: url))
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1180, height: 760),
+            contentRect: NSRect(
+                x: 0,
+                y: 0,
+                width: AppConfiguration.browserWindowSize.width,
+                height: AppConfiguration.browserWindowSize.height
+            ),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
@@ -59,6 +67,7 @@ final class InAppBrowserWindowController: NSObject, NSWindowDelegate, WKUIDelega
         let windowController = NSWindowController(window: window)
         self.webView = webView
         self.windowController = windowController
+        observe(webView)
 
         windowController.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -88,14 +97,17 @@ final class InAppBrowserWindowController: NSObject, NSWindowDelegate, WKUIDelega
         let externalButton = toolbarButton(title: "浏览器", toolTip: "在默认浏览器中打开", action: #selector(openInDefaultBrowser), minimumWidth: 64)
 
         let addressField = NSTextField(string: initialURL.absoluteString)
-        addressField.isEditable = false
+        addressField.isEditable = true
         addressField.isSelectable = true
-        addressField.placeholderString = "当前网址"
+        addressField.placeholderString = "输入网址后按回车"
         addressField.bezelStyle = .roundedBezel
         addressField.backgroundColor = NSColor.controlBackgroundColor
-        addressField.focusRingType = .none
+        addressField.focusRingType = .default
         addressField.font = .systemFont(ofSize: 14, weight: .medium)
         addressField.lineBreakMode = .byTruncatingMiddle
+        addressField.target = self
+        addressField.action = #selector(loadAddressFromField)
+        addressField.delegate = self
         addressField.translatesAutoresizingMaskIntoConstraints = false
         addressField.setContentHuggingPriority(.defaultLow, for: .horizontal)
         addressField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -138,7 +150,7 @@ final class InAppBrowserWindowController: NSObject, NSWindowDelegate, WKUIDelega
     }
 
     private func toolbarButton(title: String, toolTip: String, action: Selector, minimumWidth: CGFloat = 34) -> NSButton {
-        let button = NSButton(title: title, target: self, action: action)
+        let button = PointingHandButton(title: title, target: self, action: action)
         button.bezelStyle = .rounded
         button.controlSize = .regular
         button.font = .systemFont(ofSize: 13, weight: .medium)
@@ -154,6 +166,8 @@ final class InAppBrowserWindowController: NSObject, NSWindowDelegate, WKUIDelega
         webView?.stopLoading()
         webView?.uiDelegate = nil
         webView?.navigationDelegate = nil
+        urlObservation = nil
+        titleObservation = nil
         windowController?.close()
         webView = nil
         windowController = nil
@@ -172,6 +186,8 @@ final class InAppBrowserWindowController: NSObject, NSWindowDelegate, WKUIDelega
         webView?.stopLoading()
         webView?.uiDelegate = nil
         webView?.navigationDelegate = nil
+        urlObservation = nil
+        titleObservation = nil
         webView = nil
         windowController = nil
         backButton = nil
@@ -192,6 +208,18 @@ final class InAppBrowserWindowController: NSObject, NSWindowDelegate, WKUIDelega
         }
 
         return nil
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+    ) {
+        if navigationAction.shouldPerformDownload {
+            decisionHandler(.download)
+        } else {
+            decisionHandler(.allow)
+        }
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
@@ -236,6 +264,18 @@ final class InAppBrowserWindowController: NSObject, NSWindowDelegate, WKUIDelega
     @objc private func openInDefaultBrowser() {
         guard let url = webView?.url else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    @objc private func loadAddressFromField() {
+        guard let webView, let addressField else { return }
+        guard let url = normalizedURL(from: addressField.stringValue) else {
+            NSSound.beep()
+            updateBrowserControls()
+            return
+        }
+
+        webView.load(URLRequest(url: url))
+        addressField.stringValue = url.absoluteString
     }
 
     private func updateBrowserControls() {
@@ -309,14 +349,9 @@ final class InAppBrowserWindowController: NSObject, NSWindowDelegate, WKUIDelega
     }
 
     private func downloadsDirectory() throws -> URL {
-        let supportDirectory = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support", isDirectory: true)
-
-        let directory = supportDirectory
-            .appendingPathComponent("MacScreen", isDirectory: true)
-            .appendingPathComponent("Downloads", isDirectory: true)
+        let directory = AppConfiguration.applicationSupportBaseDirectory
+            .appendingPathComponent(AppConfiguration.applicationSupportDirectoryName, isDirectory: true)
+            .appendingPathComponent(AppConfiguration.downloadDirectoryName, isDirectory: true)
 
         try FileManager.default.createDirectory(
             at: directory,
@@ -350,7 +385,32 @@ final class InAppBrowserWindowController: NSObject, NSWindowDelegate, WKUIDelega
             .joined(separator: "-")
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
-        return cleaned.isEmpty ? "MacScreenDownload" : cleaned
+        return cleaned.isEmpty ? AppConfiguration.defaultDownloadFilename : cleaned
+    }
+
+    private func normalizedURL(from rawValue: String) -> URL? {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if let url = URL(string: trimmed), url.scheme != nil {
+            return url
+        }
+
+        return URL(string: "https://\(trimmed)")
+    }
+
+    private func observe(_ webView: WKWebView) {
+        urlObservation = webView.observe(\.url, options: [.new]) { [weak self] _, _ in
+            Task { @MainActor [weak self] in
+                self?.updateBrowserControls()
+            }
+        }
+
+        titleObservation = webView.observe(\.title, options: [.new]) { [weak self] _, _ in
+            Task { @MainActor [weak self] in
+                self?.updateBrowserControls()
+            }
+        }
     }
 
     private func showDownloadError(_ message: String) {
@@ -360,5 +420,24 @@ final class InAppBrowserWindowController: NSObject, NSWindowDelegate, WKUIDelega
         alert.alertStyle = .warning
         alert.addButton(withTitle: "知道了")
         alert.runModal()
+    }
+
+    private static let pointerCursorScript = WKUserScript(
+        source: """
+        (() => {
+          const style = document.createElement('style');
+          style.textContent = `a, button, [role="button"], input[type="button"], input[type="submit"], input[type="reset"], label, select, summary, [onclick], [tabindex]:not([tabindex="-1"]) { cursor: pointer !important; } input[type="text"], input[type="search"], textarea { cursor: text !important; }`;
+          document.documentElement.appendChild(style);
+        })();
+        """,
+        injectionTime: .atDocumentEnd,
+        forMainFrameOnly: false
+    )
+}
+
+private final class PointingHandButton: NSButton {
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        addCursorRect(bounds, cursor: .pointingHand)
     }
 }

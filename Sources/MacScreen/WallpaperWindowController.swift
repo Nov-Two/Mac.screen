@@ -4,54 +4,75 @@ import AVFoundation
 @MainActor
 final class WallpaperWindowController: ObservableObject {
     @Published private(set) var activeURL: URL?
+    @Published private(set) var isPaused = false
 
     private var windows: [NSWindow] = []
     private var players: [AVPlayer] = []
 
-    func apply(videoURL: URL) {
+    @discardableResult
+    func apply(videoURL: URL) -> Bool {
         stop()
 
         guard FileManager.default.isReadableFile(atPath: videoURL.path) else {
-            UserDefaults.standard.removeObject(forKey: UserDefaultsKeys.lastWallpaperPath)
-            return
+            return false
         }
 
-        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+        let screens = NSScreen.screens.isEmpty ? (NSScreen.main.map { [$0] } ?? []) : NSScreen.screens
+        guard !screens.isEmpty else { return false }
 
-        let playerItem = AVPlayerItem(url: videoURL)
-        let player = AVPlayer(playerItem: playerItem)
-        player.isMuted = true
-        player.actionAtItemEnd = .none
+        for screen in screens {
+            let playerItem = AVPlayerItem(url: videoURL)
+            let player = AVPlayer(playerItem: playerItem)
+            player.isMuted = true
+            player.actionAtItemEnd = .none
 
-        let playerView = PlayerView(frame: screen.frame)
-        playerView.player = player
+            let playerView = PlayerView(frame: screen.frame)
+            playerView.player = player
 
-        let window = NSWindow(
-            contentRect: screen.frame,
-            styleMask: [.borderless],
-            backing: .buffered,
-            defer: false,
-            screen: screen
-        )
+            let window = NSWindow(
+                contentRect: screen.frame,
+                styleMask: [.borderless],
+                backing: .buffered,
+                defer: false,
+                screen: screen
+            )
 
-        window.contentView = playerView
-        window.backgroundColor = .black
-        window.isOpaque = true
-        window.ignoresMouseEvents = true
-        window.isReleasedWhenClosed = false
-        window.canHide = false
-        window.hidesOnDeactivate = false
-        window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
-        window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopWindow)))
-        window.orderBack(nil)
+            window.contentView = playerView
+            window.backgroundColor = .black
+            window.isOpaque = true
+            window.ignoresMouseEvents = true
+            window.isReleasedWhenClosed = false
+            window.canHide = false
+            window.hidesOnDeactivate = false
+            window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+            window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopWindow)))
+            window.orderBack(nil)
 
-        player.play()
+            player.play()
 
-        windows.append(window)
-        players.append(player)
+            windows.append(window)
+            players.append(player)
+        }
 
         activeURL = videoURL
-        UserDefaults.standard.set(videoURL.path, forKey: UserDefaultsKeys.lastWallpaperPath)
+        isPaused = false
+        return true
+    }
+
+    func pause() {
+        guard activeURL != nil else { return }
+        players.forEach { $0.pause() }
+        isPaused = true
+    }
+
+    func resume() {
+        guard activeURL != nil else { return }
+        players.forEach { $0.play() }
+        isPaused = false
+    }
+
+    func togglePause() {
+        isPaused ? resume() : pause()
     }
 
     func stop() {
@@ -68,5 +89,6 @@ final class WallpaperWindowController: ObservableObject {
         players.removeAll()
         windows.removeAll()
         activeURL = nil
+        isPaused = false
     }
 }

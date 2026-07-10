@@ -3,11 +3,6 @@ import AVFoundation
 import Foundation
 
 enum WallpaperLibrary {
-    private static let supportedVideoExtensions: Set<String> = ["mp4", "mov", "m4v"]
-    private static let supportedArchiveExtensions: Set<String> = ["zip"]
-    private static let minimumImportedVideoWidth = 1920
-    private static let minimumImportedVideoHeight = 1080
-
     struct ImportResult {
         let importedURLs: [URL]
         let rejectedLowResolutionFilenames: [String]
@@ -15,9 +10,9 @@ enum WallpaperLibrary {
 
     static var bundledVideoDirectory: URL {
         let candidates = [
-            Bundle.main.resourceURL?.appendingPathComponent("Videos", isDirectory: true),
-            URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("Videos", isDirectory: true),
-            URL(fileURLWithPath: "/Users/user/Desktop/project/Mac.screen/Videos", isDirectory: true)
+            Bundle.main.resourceURL?.appendingPathComponent(AppConfiguration.bundledVideoDirectoryName, isDirectory: true),
+            URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+                .appendingPathComponent(AppConfiguration.bundledVideoDirectoryName, isDirectory: true)
         ].compactMap { $0 }
 
         return candidates.first { url in
@@ -26,14 +21,9 @@ enum WallpaperLibrary {
     }
 
     static var userVideoDirectory: URL {
-        let supportDirectory = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support", isDirectory: true)
-
-        return supportDirectory
-            .appendingPathComponent("MacScreen", isDirectory: true)
-            .appendingPathComponent("Videos", isDirectory: true)
+        AppConfiguration.applicationSupportBaseDirectory
+            .appendingPathComponent(AppConfiguration.applicationSupportDirectoryName, isDirectory: true)
+            .appendingPathComponent(AppConfiguration.userVideoDirectoryName, isDirectory: true)
     }
 
     static func loadItems() async -> [WallpaperItem] {
@@ -176,17 +166,17 @@ enum WallpaperLibrary {
     }
 
     private static func isSupportedVideo(_ url: URL) -> Bool {
-        supportedVideoExtensions.contains(url.pathExtension.lowercased())
+        AppConfiguration.supportedVideoExtensions.contains(url.pathExtension.lowercased())
     }
 
     private static func isSupportedArchive(_ url: URL) -> Bool {
-        supportedArchiveExtensions.contains(url.pathExtension.lowercased())
+        AppConfiguration.supportedArchiveExtensions.contains(url.pathExtension.lowercased())
     }
 
     private static func importVideosFromArchive(_ archiveURL: URL) async throws -> ImportResult {
         let fileManager = FileManager.default
         let extractionDirectory = fileManager.temporaryDirectory
-            .appendingPathComponent("MacScreenArchiveImport", isDirectory: true)
+            .appendingPathComponent(AppConfiguration.archiveImportTemporaryDirectoryName, isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
 
         try fileManager.createDirectory(
@@ -288,7 +278,8 @@ enum WallpaperLibrary {
             return false
         }
 
-        return resolution.width >= minimumImportedVideoWidth && resolution.height >= minimumImportedVideoHeight
+        return resolution.width >= AppConfiguration.minimumImportedVideoWidth
+            && resolution.height >= AppConfiguration.minimumImportedVideoHeight
     }
 
     private static func videoResolution(for asset: AVAsset) async -> (width: Int, height: Int)? {
@@ -309,8 +300,13 @@ enum WallpaperLibrary {
     private static func thumbnail(for videoURL: URL, asset: AVAsset) -> NSImage? {
         let name = videoURL.lastPathComponent + ".png"
         let candidates = [
-            Bundle.main.resourceURL?.appendingPathComponent("Thumbnails", isDirectory: true).appendingPathComponent(name),
-            URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("Assets/Thumbnails", isDirectory: true).appendingPathComponent(name)
+            Bundle.main.resourceURL?
+                .appendingPathComponent(AppConfiguration.thumbnailDirectoryName, isDirectory: true)
+                .appendingPathComponent(name),
+            URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+                .appendingPathComponent(AppConfiguration.localAssetDirectoryName, isDirectory: true)
+                .appendingPathComponent(AppConfiguration.thumbnailDirectoryName, isDirectory: true)
+                .appendingPathComponent(name)
         ].compactMap { $0 }
 
         if let bundledThumbnail = candidates.lazy.compactMap({ NSImage(contentsOf: $0) }).first {
@@ -323,7 +319,7 @@ enum WallpaperLibrary {
     private static func generatedThumbnail(for asset: AVAsset) -> NSImage? {
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
-        generator.maximumSize = CGSize(width: 1280, height: 720)
+        generator.maximumSize = AppConfiguration.generatedThumbnailMaximumSize
 
         do {
             let image = try generator.copyCGImage(at: .zero, actualTime: nil)
