@@ -32,9 +32,15 @@
 │   └── MacScreen/
 │       ├── MacScreenApp.swift      # SwiftUI App 入口
 │       ├── AppDelegate.swift       # AppKit 生命周期补充
+│       ├── AppConfiguration.swift  # 运行时配置集中管理
 │       ├── ContentView.swift       # 主界面
+│       ├── PreferencesView.swift   # macOS 原生偏好设置页
+│       ├── StatusBarController.swift # 菜单栏常驻入口
 │       ├── SoftwareUpdateController.swift # Sparkle 自动更新入口
+│       ├── LoginItemController.swift # 开机启动注册
+│       ├── LowBatteryMonitorController.swift # 低电量监控和用户决策弹窗
 │       ├── WallpaperLibrary.swift  # 扫描资源、读取视频信息和缩略图
+│       ├── WallpaperService.swift  # 业务服务抽象，便于测试
 │       ├── WallpaperStore.swift    # SwiftUI 状态管理
 │       ├── WallpaperWindowController.swift # 桌面动态壁纸窗口控制
 │       ├── PlayerView.swift        # AVPlayerLayer 承载视图
@@ -45,6 +51,7 @@
 ├── DEVELOPMENT.md                  # 开发维护文档
 ├── Makefile                        # 构建、运行、打包、清理
 ├── Package.swift                   # SwiftPM 元数据
+├── Tests/                          # SwiftPM 测试
 └── README.md                       # 项目介绍
 ```
 
@@ -235,14 +242,44 @@ AUTO_UPDATE_GUIDE.md
 为了避免影响正常工作，当前版本刻意采用低负载策略：
 
 - App 启动时不自动播放视频
-- App 启动时不自动恢复上次动态壁纸
+- App 启动时默认不自动恢复上次动态壁纸；用户可在菜单栏开启
 - 右侧只显示静态预览图，不播放 4K 视频
 - 缩略图在构建阶段生成，不在 App 启动阶段同步抽帧
 - 点击“应用到桌面”后才创建 AVPlayer 播放视频
-- 当前 MVP 只应用主屏，不做多屏同时播放
+- 当前会把同一个动态壁纸应用到所有屏幕
+- 低电量暂停默认关闭；开启后会先暂停播放并让用户决定停止、退出或继续播放
+- 开机启动默认关闭，通过菜单栏开关注册或取消 `SMAppService.mainApp`
+- App 会做单实例保护，避免多个副本同时争抢桌面壁纸窗口
+- 内置浏览器允许用户直接下载资源，下载完成后自动尝试导入
+- 下载资源导入成功后默认清理下载源文件
 - 退出时会停止播放器并关闭动态壁纸窗口
 
 ## 当前实现说明
+
+### 配置集中管理
+
+运行时配置集中在 `AppConfiguration`，包括：
+
+- App 名称和 Application Support 子目录
+- 内置视频、缩略图、下载目录和链接资源目录名
+- 支持的视频和压缩包扩展名
+- 导入视频的最低分辨率
+- 壁纸网站、GitHub 链接和内置浏览器窗口尺寸
+- 低电量暂停阈值和轮询间隔
+- 内置浏览器窗口尺寸和默认下载文件名
+
+后续新增可调参数时，优先放到 `AppConfiguration`，避免散落硬编码。
+
+### 业务与 UI 边界
+
+`WallpaperStore` 是 SwiftUI 视图使用的状态入口，但资源加载、导入、删除、隐藏、设置读写等能力通过 `WallpaperServicing` 抽象出来。默认实现是 `DefaultWallpaperService`，测试中可以替换为 mock service。
+
+这样做的目的：
+
+- UI 只关心状态和用户动作
+- 业务逻辑可以独立测试
+- UserDefaults、文件系统、登录项等系统依赖集中在 service 或专用 controller 中
+- 后续做偏好设置页或自动化测试时不需要重写主界面
 
 ### 资源扫描
 
@@ -250,7 +287,6 @@ AUTO_UPDATE_GUIDE.md
 
 1. App bundle 里的 `Resources/Videos`
 2. 当前工作目录下的 `Videos`
-3. 开发机固定路径 `/Users/user/Desktop/project/Mac.screen/Videos`
 
 正常构建后的 App 应该走第一项。
 
@@ -275,14 +311,126 @@ Assets/Thumbnails/示例壁纸.mp4.png
 
 `WallpaperWindowController` 负责创建桌面播放窗口：
 
-- 只使用主屏
+- 遍历 `NSScreen.screens`，所有屏幕同步播放同一个视频
 - 无边框
 - 忽略鼠标事件
 - 静音播放
 - 循环播放
+- 支持暂停、继续、停止
 - 窗口层级使用 `desktopWindow`
 
 这部分是动态壁纸 MVP 的核心，也是最容易影响系统体验的地方。后续修改必须谨慎。
+
+### 菜单栏入口
+
+`StatusBarController` 负责菜单栏常驻入口。状态栏 item 必须延迟到 App UI 出现后创建，不要在 `MacScreenApp.init()` 期间创建，否则 macOS 15 上可能在 AppKit/SkyLight 初始化阶段崩溃。
+
+菜单栏当前包含：
+
+- 当前播放、暂停或选择状态
+- 显示主窗口
+- 添加视频
+- 应用当前选择
+- 暂停或继续播放
+- 下一个动态壁纸
+- 停止动态壁纸
+- 开机启动
+- 启动时恢复上次壁纸
+- 低电量时暂停并提醒
+- 偏好设置
+- 初始化资源
+- 打开壁纸网站
+- 退出 App
+
+### 偏好设置页
+
+`PreferencesView` 使用 SwiftUI `Settings` 场景承载，集中管理常用设置：
+
+- 开机启动
+- 启动时恢复上次壁纸
+- 低电量时暂停并提醒
+- 下载导入成功后清理源文件
+- 查看下载行为和下载目录
+
+菜单栏保留高频操作和设置开关；偏好设置页用于集中解释和管理不需要频繁操作的选项。
+
+### 素材墙界面
+
+主界面当前采用固定尺寸素材墙，而不是左侧列表加右侧大预览：
+
+- 素材卡片固定为 16:9 尺寸，避免不同素材互相挤压或碰撞
+- 图片使用 `scaledToFill` 裁切填充，保持卡片尺寸一致
+- hover 覆盖层不改变卡片尺寸，只显示在卡片内部
+- 卡片外层固定尺寸还不够，图片层、overlay 层、角标层也必须显式使用同一个固定宽高；否则大尺寸素材可能影响内部布局 proposal，导致文字层位置不一致
+- hover 覆盖层内部使用固定分区：左侧显示主分类、标题、分辨率和时长；右侧固定收藏和应用按钮。文字只截断，不挤压按钮
+- 父视图维护 `hoveredItemID`，保证同一时间只有一个卡片显示 hover 信息
+- 顶部提供标题/标签搜索、收藏筛选和自动标签分类
+- 分类栏中“全部”和“收藏”固定在最左侧，其他自动分类放在横向滚动区域
+- 当前分类刻意收敛为少量主分类：二次元、风景、人物、其他。不要直接把文件名拆出的所有词铺到顶部
+- 当筛选或搜索结果为空时展示空状态提示
+- 收藏路径存入 `favoriteWallpaperPaths`
+
+后续新增分类数据模型时，可以保留当前自动标签作为 fallback。
+
+### 内置浏览器下载
+
+`InAppBrowserWindowController` 的目标是尽量接近普通浏览器的朴素体验：
+
+- 地址栏会跟随 WebView 当前 URL 更新，也允许用户直接输入地址并回车跳转
+- 页面触发下载时不做来源、类型、大小拦截
+- 下载文件落到 MacScreen 自己的 Application Support 下载目录，并自动处理重名
+- 下载完成后交给 `WallpaperStore.importDownloadedResource` 尝试自动导入
+- 主窗口和内置浏览器的明确交互控件应显示小手光标
+
+导入成功后，如果 `cleansDownloadedResourcesAfterImport` 为 true，Store 会删除 Application Support 下载目录中的源文件，避免长期堆积。不要删除用户手动选择导入的原始视频文件。
+
+### 单实例保护
+
+`AppDelegate` 会在启动完成时检查同 bundle identifier 的其他运行实例。如果发现已有实例，会激活已有实例并退出当前实例。这样可以避免用户从 DMG、Downloads、Applications 或开发构建中同时打开多个副本，导致多个桌面窗口互相抢占。
+
+### 开机启动
+
+`LoginItemController` 使用 `SMAppService.mainApp` 注册或取消开机启动。该功能通过菜单栏开关触发，`WallpaperStore` 只维护状态和错误信息。
+
+开机启动失败时，Store 会把错误写入 `errorMessage`，不应让 App 崩溃。
+
+### 低电量暂停
+
+`LowBatteryMonitorController` 通过 IOKit Power Sources API 读取电池状态，默认每 60 秒检查一次。触发条件：
+
+- 用户开启“低电量时暂停并提醒”
+- 当前使用电池供电
+- 电量小于或等于 `AppConfiguration.lowBatteryPauseThresholdPercent`
+- 当前正在播放动态壁纸
+
+触发后会先暂停播放，再弹出 `NSAlert`。用户可以选择：
+
+- 停止壁纸
+- 退出应用
+- 继续播放
+
+为了避免反复打扰，同一次低电量状态只提醒一次；电量恢复或不再满足低电量条件后，提醒状态会重置。
+
+### 测试
+
+项目现在包含 SwiftPM 测试 target：
+
+```bash
+swift test
+```
+
+当前测试重点覆盖 `WallpaperStore` 的核心状态行为：
+
+- 根据上次壁纸路径恢复选中项
+- 切换下一个动态壁纸并循环回第一个
+- 启动时恢复上次壁纸开关
+- 低电量暂停开关
+- 开机启动开关对 service 的委托
+- 下载导入后清理开关
+- 收藏路径持久化
+- 内置浏览器下载完成后的自动导入流程
+
+不要在单元测试中直接注册系统登录项，测试应通过 mock `WallpaperServicing` 验证 Store 行为。
 
 ## 维护建议
 
@@ -290,9 +438,9 @@ Assets/Thumbnails/示例壁纸.mp4.png
 
 启动阶段只做轻量操作：扫描文件、加载已有缩略图、展示 UI。不要在启动时创建 `AVPlayer` 播放 4K 视频。
 
-2. 不要在 App 启动时自动恢复动态壁纸
+2. 自动恢复动态壁纸必须保持可控
 
-自动恢复会让用户打开 App 时立刻铺屏，影响验证和正常工作。后续如果要加恢复功能，必须做成设置项，并默认关闭。
+自动恢复会让用户打开 App 时立刻铺屏，影响验证和正常工作。当前已经做成菜单栏设置项，并默认关闭。后续不要改成默认开启。
 
 3. 不要直接依赖 Desktop 目录权限
 
@@ -336,6 +484,18 @@ SwiftUI 负责主界面和状态展示。AppKit 只负责：
 - Archive
 - Notarization
 
+9. AppKit 对象创建时机要保守
+
+菜单栏 `NSStatusItem` 这类 AppKit/SkyLight 相关对象不要在 SwiftUI `App` 初始化阶段创建。曾经在 `StatusBarController` 属性初始化时创建 status item，`make run` 会在 macOS 15 上启动即崩溃。正确做法是延迟到 `onAppear` 后配置。
+
+10. 系统能力要包一层
+
+开机启动、低电量监控、下载、更新这类系统能力应放在 controller/service 中，视图层只调用 Store 或闭包。这样便于测试，也能减少系统 API 变化对 UI 的影响。
+
+11. 下载功能要保持直接可用
+
+内置浏览器下载不要增加来源、类型、大小拦截。用户在网页里点击下载后，应直接落盘到应用下载目录；下载完成后再由 Store 尝试导入支持的视频或 zip 资源包。文件名清理、重名处理和导入后清理可以保留，它们用于稳定落盘和避免堆积，不限制用户下载。
+
 ## 常用命令
 
 ```bash
@@ -347,6 +507,9 @@ make build
 
 # 打包 DMG
 make package
+
+# 运行测试
+swift test
 
 # 清理构建产物
 make clean
@@ -475,6 +638,53 @@ call to main actor-isolated initializer 'init()' in a synchronous nonisolated co
 - `WallpaperStore` 和 `WallpaperWindowController` 保持 `@MainActor`
 - SwiftUI App 使用 `@StateObject` 在 SwiftUI 生命周期中创建它们
 - AppKit delegate 只做必要生命周期补充
+
+### 9. 状态栏过早创建导致启动崩溃
+
+加入菜单栏常驻入口时，曾经把 `NSStatusBar.system.statusItem` 放在 `StatusBarController` 属性初始化中。`make run` 后 App 在启动阶段崩溃，崩溃栈集中在：
+
+```text
+StatusBarController.init()
+NSStatusItem _initWithStatusBar
+SkyLight CGSConnectionByID
+```
+
+处理方式：
+
+- `StatusBarController` 只保存可选的 `NSStatusItem`
+- 在 App 主界面 `onAppear` 后调用 `configure`
+- `configure` 内部再创建或复用 status item
+
+这类 AppKit 对象创建时机后续也要保持保守。
+
+### 10. 本轮阶段性优化记录
+
+2026-07-10 完成了一轮从 MVP 到常驻工具的基础优化：
+
+- 移除运行时代码中的开发机绝对路径 fallback
+- 新增 `AppConfiguration` 集中配置
+- 新增 `WallpaperServicing` 和 `DefaultWallpaperService`，隔离业务与 UI
+- 新增 SwiftPM 测试 target
+- 新增菜单栏常驻入口
+- 新增暂停、继续、下一个动态壁纸
+- 动态壁纸播放从主屏扩展为所有屏幕同步播放
+- 新增单实例保护
+- 新增启动时恢复上次壁纸开关
+- 新增开机启动开关
+- 新增低电量暂停提醒和用户决策弹窗
+- 新增偏好设置页
+- 新增内置浏览器下载、自动导入和导入后清理
+
+阶段性自测命令：
+
+```bash
+swift test
+make run
+make package
+codesign --verify --deep --strict .build/MacScreen.app
+```
+
+验证结果：测试、运行、打包和签名校验均通过。低电量弹窗依赖真实电池状态，当前只验证了编译、启动、设置持久化和监控接入。
 
 ## 给后续维护者的一句话
 
