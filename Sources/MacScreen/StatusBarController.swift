@@ -141,6 +141,7 @@ final class StatusBarController: NSObject {
         iconView.imageScaling = .scaleProportionallyUpOrDown
         iconView.frame = NSRect(x: 8, y: 6, width: 16, height: 16)
         iconView.autoresizingMask = [.minYMargin, .maxYMargin]
+        iconView.tag = 100
         view.addSubview(iconView)
 
         let slider = NSSlider(value: Double(volume), minValue: 0, maxValue: 1, target: self, action: #selector(menuVolumeChanged(_:)))
@@ -155,6 +156,7 @@ final class StatusBarController: NSObject {
         label.alignment = .right
         label.frame = NSRect(x: 136, y: 4, width: 34, height: 20)
         label.autoresizingMask = [.minYMargin, .maxYMargin]
+        label.tag = 200
         view.addSubview(label)
 
         let item = NSMenuItem()
@@ -163,7 +165,28 @@ final class StatusBarController: NSObject {
     }
 
     @objc private func menuVolumeChanged(_ sender: NSSlider) {
-        wallpaperController?.volume = sender.floatValue
+        let volume = sender.floatValue
+        wallpaperController?.volume = volume
+
+        guard let container = sender.superview else { return }
+
+        let iconName: String
+        if volume == 0 {
+            iconName = "speaker.slash.fill"
+        } else if volume < 0.5 {
+            iconName = "speaker.wave.1.fill"
+        } else {
+            iconName = "speaker.wave.3.fill"
+        }
+
+        if let iconView = container.viewWithTag(100) as? NSImageView {
+            iconView.image = NSImage(systemSymbolName: iconName, accessibilityDescription: nil)
+        }
+
+        if let label = container.viewWithTag(200) as? NSTextField {
+            let percentage = Int(volume * 100)
+            label.stringValue = "\(percentage)%"
+        }
     }
 
     private func updateStatusButton(activeTitle: String?, isPaused: Bool) {
