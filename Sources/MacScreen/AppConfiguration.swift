@@ -21,7 +21,7 @@ enum AppConfiguration {
 
     static let wallpaperWebsiteURL = URL(string: "https://haowallpaper.com/")!
     static let wallpaperWebsiteTitle = "haowallpaper.com"
-    static let githubProfileURL = URL(string: "https://github.com/")!
+    static let githubProfileURL = URL(string: "https://github.com/Nov-Two/Mac.screen/tree/master/AuthorVideos")!
 
     static let browserWindowSize = CGSize(width: 1180, height: 760)
     static let lowBatteryPauseThresholdPercent = 20
