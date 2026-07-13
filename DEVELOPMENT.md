@@ -44,6 +44,7 @@
 │       ├── WallpaperStore.swift    # SwiftUI 状态管理
 │       ├── WallpaperWindowController.swift # 桌面动态壁纸窗口控制
 │       ├── PlayerView.swift        # AVPlayerLayer 承载视图
+│       ├── VolumeOverlayView.swift  # 桌面音量控制叠加层视图
 │       ├── WallpaperItem.swift     # 壁纸资源模型
 │       └── UserDefaultsKeys.swift  # UserDefaults key
 ├── Videos/                         # 内置 mp4 动态壁纸资源
@@ -314,10 +315,12 @@ Assets/Thumbnails/示例壁纸.mp4.png
 - 遍历 `NSScreen.screens`，所有屏幕同步播放同一个视频
 - 无边框
 - 忽略鼠标事件
-- 静音播放
+- 非静音播放，音量由全局音量控制管理
 - 循环播放
 - 支持暂停、继续、停止
 - 窗口层级使用 `desktopWindow`
+- 每个屏幕在底部居中位置叠加一个半透明音量控件（`VolumeOverlayView`），层级比壁纸窗口高一级
+- 音量值通过 `UserDefaults` 持久化，主窗口、桌面叠加层、菜单栏三处双向同步
 
 这部分是动态壁纸 MVP 的核心，也是最容易影响系统体验的地方。后续修改必须谨慎。
 
@@ -334,6 +337,7 @@ Assets/Thumbnails/示例壁纸.mp4.png
 - 暂停或继续播放
 - 下一个动态壁纸
 - 停止动态壁纸
+- 音量控制滑块
 - 开机启动
 - 启动时恢复上次壁纸
 - 低电量时暂停并提醒
