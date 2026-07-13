@@ -26,6 +26,24 @@ enum AppConfiguration {
     static let browserWindowSize = CGSize(width: 1180, height: 760)
     static let lowBatteryPauseThresholdPercent = 20
     static let lowBatteryMonitorInterval: TimeInterval = 60
+    static let aboutPanel = AboutPanelConfiguration(
+        credits: """
+        一个轻量的 macOS 动态壁纸应用。
+
+        用来浏览、导入并应用本地视频素材到桌面。
+        """
+    )
+    static let helpPanel = AlertPanelConfiguration(
+        menuTitle: "MacScreen 帮助",
+        title: "Help",
+        message: "MacScreen 使用帮助",
+        informativeText: """
+        1. 点击“添加”导入本地视频
+        2. 选中素材后点击“应用选中”
+        3. 如果卡顿，可以关闭右上角“动态效果”
+        """,
+        primaryButtonTitle: "OK"
+    )
     static let wallpaperCardHover = WallpaperCardHoverConfiguration(
         perspective: 0.85,
         deadZone: 0.16,
@@ -101,4 +119,22 @@ struct WallpaperCardHoverConfiguration {
     let highlightMaxOpacity: CGFloat
     /// 鼠标离开后回正动画时长。
     let resetAnimationDuration: Double
+}
+
+struct AboutPanelConfiguration {
+    /// 标准 About 面板底部的补充说明，会显示在版本号下面。
+    let credits: String
+}
+
+struct AlertPanelConfiguration {
+    /// 菜单中的标题文案。
+    let menuTitle: String
+    /// 弹窗标题。
+    let title: String
+    /// 弹窗主文案。
+    let message: String
+    /// 弹窗补充说明。
+    let informativeText: String
+    /// 主按钮标题。
+    let primaryButtonTitle: String
 }

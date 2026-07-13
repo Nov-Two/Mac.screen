@@ -28,8 +28,20 @@ struct MacScreenApp: App {
         }
         .windowResizability(.contentMinSize)
         .commands {
+            CommandGroup(replacing: .appInfo) {
+                Button("About \(AppConfiguration.appName)") {
+                    showAboutPanel()
+                }
+            }
+
             CommandGroup(after: .appInfo) {
                 CheckForUpdatesView(updateController: softwareUpdateController)
+            }
+
+            CommandGroup(replacing: .help) {
+                Button(AppConfiguration.helpPanel.menuTitle) {
+                    showHelpPanel()
+                }
             }
         }
 
@@ -103,5 +115,39 @@ struct MacScreenApp: App {
         } else {
             store.clearLastWallpaper()
         }
+    }
+
+    private func showAboutPanel() {
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = .center
+
+        let credits = NSAttributedString(
+            string: AppConfiguration.aboutPanel.credits,
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 12),
+                .foregroundColor: NSColor.secondaryLabelColor,
+                .paragraphStyle: paragraphStyle
+            ]
+        )
+
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.orderFrontStandardAboutPanel(
+            options: [
+                .credits: credits
+            ]
+        )
+    }
+
+    private func showHelpPanel() {
+        let configuration = AppConfiguration.helpPanel
+        let alert = NSAlert()
+        alert.messageText = configuration.title
+        alert.informativeText = configuration.informativeText.isEmpty
+            ? configuration.message
+            : "\(configuration.message)\n\n\(configuration.informativeText)"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: configuration.primaryButtonTitle)
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
     }
 }
