@@ -432,6 +432,54 @@ swift test
 
 不要在单元测试中直接注册系统登录项，测试应通过 mock `WallpaperServicing` 验证 Store 行为。
 
+### 素材卡片 3D hover 动效
+
+素材卡片支持基于鼠标实时坐标的 3D 倾斜动效：
+
+- 鼠标在卡片内移动时，卡片会根据鼠标位置产生 `rotateX`、`rotateY`、`scale` 和 `offset` 变化
+- 底图层、文字信息层、操作按钮层分别以不同倍率跟随，制造层次感
+- 中心区域设有死区，避免鼠标在中心时卡片轻微抖动
+- 鼠标离开后卡片平滑回正
+- 工具栏右上角提供开关按钮（`ToolbarToggleButton`），关闭后停用连续鼠标跟踪以减轻卡顿；状态通过 `UserDefaults` 持久化
+- 高光效果当前处于"参数保留、渲染禁用"状态，通过 `isHighlightEnabled` 控制
+- 所有动效参数集中在 `AppConfiguration.wallpaperCardHover`，可直接调整倾斜角度、偏移量、缩放、阴影、死区等，不对外暴露 UI
+
+### 素材右键菜单
+
+右键素材卡片可弹出上下文菜单，包含：
+
+- 应用
+- 暂停 / 继续（仅当前使用中的素材显示）
+- 停止（仅当前使用中的素材显示）
+- 在 Finder 中查看
+- 删除
+
+菜单项的文案和图标配置在 `AppConfiguration.contextMenu` 中，修改标签或图标无需改动 UI 代码。
+
+### 重复导入拦截
+
+`WallpaperLibrary.findDuplicateSourceURLs` 在导入前检测源文件名是否已存在于用户素材目录。两个导入入口（文件选择面板、下载自动导入）都会先检测重复：
+
+- 存在重复则弹窗列出重复文件名并跳过导入
+- 无重复则正常导入
+- 不与内置素材比对，只检查用户素材目录
+
+### About 和 Help 面板
+
+菜单栏的 About 和 Help 面板走配置文件：
+
+- `AppConfiguration.aboutPanel` 控制标准 About 面板底部补充说明
+- `AppConfiguration.helpPanel` 控制 Help 弹窗的菜单标题、弹窗标题、正文和按钮文案
+
+### 偏好设置：打开素材目录
+
+偏好设置 → 通用标签页提供两个按钮：
+
+- "打开用户素材目录"：打开 `~/Library/Application Support/MacScreen/Videos/`
+- "打开内置素材目录"：打开 App bundle 内的 `Videos/` 文件夹
+
+用于从源头管理素材文件。
+
 ## 维护建议
 
 1. 不要在 App 启动时播放视频

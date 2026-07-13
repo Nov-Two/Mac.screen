@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-07-13
+
+- 新增素材卡片 3D hover 动效，鼠标在卡片上移动时产生 tilt/scale/offset 跟随效果，底图、文字、按钮分层响应
+- 工具栏新增动态效果开关按钮，关闭后停用连续鼠标跟踪以减轻卡顿，状态持久化
+- 动效参数集中到 `AppConfiguration.wallpaperCardHover`，支持透视强度、倾斜角度、偏移量、缩放、阴影、死区等配置
+- 新增 About 面板配置（`aboutPanel`）和 Help 弹窗配置（`helpPanel`），走 `AppConfiguration` 集中管理
+- 偏好设置新增"打开用户素材目录"和"打开内置素材目录"按钮，可在 Finder 中直接管理素材文件
+- 新增重复导入拦截：导入时检测文件名是否已在用户素材目录中存在，存在则弹窗提示并跳过
+- 新增素材右键菜单：支持应用、暂停/继续、停止、在 Finder 中查看、删除
+- 右键菜单文案和图标配置集中到 `AppConfiguration.contextMenu`
+
 ## 2026-07-10
 
 - Centralized runtime configuration in `AppConfiguration`, including resource directory names, external URLs, import limits, browser window size, and low-battery thresholds.
