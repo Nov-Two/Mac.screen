@@ -7,4 +7,5 @@ enum UserDefaultsKeys {
     static let cleansDownloadedResourcesAfterImport = "cleansDownloadedResourcesAfterImport"
     static let favoriteWallpaperPaths = "favoriteWallpaperPaths"
     static let enablesWallpaperCardHoverEffect = "enablesWallpaperCardHoverEffect"
+    static let wallpaperVolume = "wallpaperVolume"
 }

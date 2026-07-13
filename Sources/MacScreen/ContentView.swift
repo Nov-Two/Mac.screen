@@ -207,6 +207,8 @@ struct ContentView: View {
                 .font(.system(size: 13))
                 .foregroundStyle(.tertiary)
 
+            volumeControl
+
             Spacer()
 
             Button {
@@ -250,6 +252,29 @@ struct ContentView: View {
         .padding(.horizontal, 22)
         .padding(.vertical, 12)
         .background(.bar)
+    }
+
+    private var volumeControl: some View {
+        HStack(spacing: 6) {
+            Image(systemName: wallpaperController.volume == 0
+                  ? "speaker.slash.fill"
+                  : wallpaperController.volume < 0.5
+                  ? "speaker.wave.1.fill"
+                  : "speaker.wave.3.fill")
+                .font(.system(size: 11))
+                .frame(width: 16)
+                .foregroundStyle(.secondary)
+
+            Slider(value: $wallpaperController.volume)
+                .frame(width: 100)
+                .controlSize(.mini)
+
+            Text("\(Int(wallpaperController.volume * 100))%")
+                .font(.system(size: 11, weight: .medium).monospacedDigit())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .frame(width: 36, alignment: .trailing)
+        }
     }
 
     private var statusText: some View {

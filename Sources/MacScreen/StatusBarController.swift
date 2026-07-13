@@ -99,6 +99,9 @@ final class StatusBarController: NSObject {
         menu.addItem(stopItem)
 
         menu.addItem(.separator())
+        menu.addItem(makeVolumeMenuItem())
+
+        menu.addItem(.separator())
         let openAtLoginItem = menuItem("开机启动", action: #selector(toggleOpenAtLoginAction), keyEquivalent: "")
         openAtLoginItem.state = opensAtLogin ? .on : .off
         menu.addItem(openAtLoginItem)
@@ -119,6 +122,48 @@ final class StatusBarController: NSObject {
         menu.addItem(menuItem("退出 \(AppConfiguration.appName)", action: #selector(quitAction), keyEquivalent: "q"))
 
         statusItem?.menu = menu
+    }
+
+    private func makeVolumeMenuItem() -> NSMenuItem {
+        let volume = wallpaperController?.volume ?? 0
+        let view = NSView(frame: NSRect(x: 0, y: 0, width: 176, height: 28))
+
+        let iconName: String
+        if volume == 0 {
+            iconName = "speaker.slash.fill"
+        } else if volume < 0.5 {
+            iconName = "speaker.wave.1.fill"
+        } else {
+            iconName = "speaker.wave.3.fill"
+        }
+
+        let iconView = NSImageView(image: NSImage(systemSymbolName: iconName, accessibilityDescription: nil) ?? NSImage())
+        iconView.imageScaling = .scaleProportionallyUpOrDown
+        iconView.frame = NSRect(x: 8, y: 6, width: 16, height: 16)
+        iconView.autoresizingMask = [.minYMargin, .maxYMargin]
+        view.addSubview(iconView)
+
+        let slider = NSSlider(value: Double(volume), minValue: 0, maxValue: 1, target: self, action: #selector(menuVolumeChanged(_:)))
+        slider.controlSize = .mini
+        slider.frame = NSRect(x: 30, y: 4, width: 100, height: 20)
+        slider.autoresizingMask = [.minYMargin, .maxYMargin]
+        view.addSubview(slider)
+
+        let percentage = Int(volume * 100)
+        let label = NSTextField(labelWithString: "\(percentage)%")
+        label.font = .monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+        label.alignment = .right
+        label.frame = NSRect(x: 136, y: 4, width: 34, height: 20)
+        label.autoresizingMask = [.minYMargin, .maxYMargin]
+        view.addSubview(label)
+
+        let item = NSMenuItem()
+        item.view = view
+        return item
+    }
+
+    @objc private func menuVolumeChanged(_ sender: NSSlider) {
+        wallpaperController?.volume = sender.floatValue
     }
 
     private func updateStatusButton(activeTitle: String?, isPaused: Bool) {
