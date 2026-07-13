@@ -271,6 +271,10 @@ final class WallpaperStore: ObservableObject {
         NSWorkspace.shared.open(directory)
     }
 
+    func openItemInFinder(_ item: WallpaperItem) {
+        NSWorkspace.shared.activateFileViewerSelecting([item.url])
+    }
+
     private func preferredInitialSelection(from items: [WallpaperItem]) -> WallpaperItem? {
         guard !items.isEmpty else { return nil }
 

@@ -156,6 +156,7 @@ struct ContentView: View {
                                 isSelected: store.selectedItems.contains(item),
                                 isActive: wallpaperController.activeURL == item.url,
                                 isFavorite: store.isFavorite(item),
+                                isPaused: wallpaperController.isPaused,
                                 isHovering: hoveredItemID == item.id,
                                 isMotionEnabled: enablesWallpaperCardHoverEffect,
                                 width: cardWidth,
@@ -168,6 +169,20 @@ struct ContentView: View {
                                 },
                                 onFavorite: {
                                     store.toggleFavorite(item)
+                                },
+                                onDelete: {
+                                    store.selectedItems = [item]
+                                    requestDeletion()
+                                },
+                                onTogglePause: {
+                                    wallpaperController.togglePause()
+                                },
+                                onStop: {
+                                    wallpaperController.stop()
+                                    store.clearLastWallpaper()
+                                },
+                                onShowInFinder: {
+                                    store.openItemInFinder(item)
                                 },
                                 onHover: { isHovering in
                                     hoveredItemID = isHovering ? item.id : (hoveredItemID == item.id ? nil : hoveredItemID)
@@ -459,6 +474,7 @@ private struct WallpaperCard: View {
     let isSelected: Bool
     let isActive: Bool
     let isFavorite: Bool
+    let isPaused: Bool
     let isHovering: Bool
     let isMotionEnabled: Bool
     let width: CGFloat
@@ -466,6 +482,10 @@ private struct WallpaperCard: View {
     let onSelect: () -> Void
     let onApply: () -> Void
     let onFavorite: () -> Void
+    let onDelete: () -> Void
+    let onTogglePause: () -> Void
+    let onStop: () -> Void
+    let onShowInFinder: () -> Void
     let onHover: (Bool) -> Void
     @State private var hoverMotion = WallpaperCardHoverState.idle
     @State private var isTrackingHover = false
@@ -543,6 +563,46 @@ private struct WallpaperCard: View {
             x: 0,
             y: hoverConfiguration.shadowYOffset + hoverMotion.strength * hoverConfiguration.shadowHoverLift
         )
+        .contextMenu {
+            let cfg = AppConfiguration.contextMenu
+
+            Button {
+                onApply()
+            } label: {
+                Label(cfg.applyLabel, systemImage: cfg.applyIcon)
+            }
+
+            if isActive {
+                Button {
+                    onTogglePause()
+                } label: {
+                    Label(isPaused ? cfg.resumeLabel : cfg.pauseLabel,
+                          systemImage: isPaused ? cfg.resumeIcon : cfg.pauseIcon)
+                }
+
+                Button {
+                    onStop()
+                } label: {
+                    Label(cfg.stopLabel, systemImage: cfg.stopIcon)
+                }
+            }
+
+            Divider()
+
+            Button {
+                onShowInFinder()
+            } label: {
+                Label(cfg.showInFinderLabel, systemImage: cfg.showInFinderIcon)
+            }
+
+            Divider()
+
+            Button(role: .destructive) {
+                onDelete()
+            } label: {
+                Label(cfg.deleteLabel, systemImage: cfg.deleteIcon)
+            }
+        }
     }
 
     private var thumbnail: some View {

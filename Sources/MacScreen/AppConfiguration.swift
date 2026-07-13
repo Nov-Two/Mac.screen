@@ -26,6 +26,20 @@ enum AppConfiguration {
     static let browserWindowSize = CGSize(width: 1180, height: 760)
     static let lowBatteryPauseThresholdPercent = 20
     static let lowBatteryMonitorInterval: TimeInterval = 60
+    static let contextMenu = ContextMenuConfiguration(
+        applyLabel: "应用",
+        applyIcon: "play.fill",
+        pauseLabel: "暂停",
+        pauseIcon: "pause.fill",
+        resumeLabel: "继续",
+        resumeIcon: "play.fill",
+        stopLabel: "停止",
+        stopIcon: "stop.fill",
+        showInFinderLabel: "在 Finder 中查看",
+        showInFinderIcon: "folder",
+        deleteLabel: "删除",
+        deleteIcon: "trash"
+    )
     static let aboutPanel = AboutPanelConfiguration(
         credits: """
         一个轻量的 macOS 动态壁纸应用。
@@ -137,4 +151,19 @@ struct AlertPanelConfiguration {
     let informativeText: String
     /// 主按钮标题。
     let primaryButtonTitle: String
+}
+
+struct ContextMenuConfiguration {
+    let applyLabel: String
+    let applyIcon: String
+    let pauseLabel: String
+    let pauseIcon: String
+    let resumeLabel: String
+    let resumeIcon: String
+    let stopLabel: String
+    let stopIcon: String
+    let showInFinderLabel: String
+    let showInFinderIcon: String
+    let deleteLabel: String
+    let deleteIcon: String
 }
