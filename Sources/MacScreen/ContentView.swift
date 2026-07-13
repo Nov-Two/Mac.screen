@@ -4,6 +4,8 @@ import SwiftUI
 struct ContentView: View {
     @ObservedObject var store: WallpaperStore
     @ObservedObject var wallpaperController: WallpaperWindowController
+    let statusBarController: StatusBarController
+    @Environment(\.openSettings) private var openSettings
     @State private var skipsDeleteConfirmation = UserDefaults.standard.bool(forKey: UserDefaultsKeys.skipsDeleteConfirmation)
     @State private var enablesWallpaperCardHoverEffect = UserDefaults.standard.object(forKey: UserDefaultsKeys.enablesWallpaperCardHoverEffect) as? Bool ?? true
     @State private var searchText = ""
@@ -29,6 +31,12 @@ struct ContentView: View {
         .task {
             await store.load()
             restoreLastWallpaperIfNeeded()
+        }
+        .onAppear {
+            statusBarController.openPreferences = { [openSettings] in
+                openSettings()
+                NSApp.activate(ignoringOtherApps: true)
+            }
         }
     }
 

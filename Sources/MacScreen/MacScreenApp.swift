@@ -14,7 +14,8 @@ struct MacScreenApp: App {
         WindowGroup("MacScreen") {
             ContentView(
                 store: store,
-                wallpaperController: wallpaperController
+                wallpaperController: wallpaperController,
+                statusBarController: statusBarController
             )
             .frame(minWidth: 980, minHeight: 640)
             .background(MainWindowAccessor())
@@ -100,10 +101,6 @@ struct MacScreenApp: App {
                     await store.importDownloadedResource(at: downloadedURL)
                 }
             }
-        }
-        statusBarController.openPreferences = {
-            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            NSApp.activate(ignoringOtherApps: true)
         }
     }
 
