@@ -247,6 +247,15 @@ enum WallpaperLibrary {
         return destinationURL
     }
 
+    /// 检查源文件列表中哪些文件名已在目标目录存在，返回重复的源 URL 列表。
+    static func findDuplicateSourceURLs(in sourceURLs: [URL], directory: URL) -> [URL] {
+        let fileManager = FileManager.default
+        return sourceURLs.filter { sourceURL in
+            let destinationURL = directory.appendingPathComponent(sourceURL.lastPathComponent)
+            return fileManager.fileExists(atPath: destinationURL.path)
+        }
+    }
+
     private static func durationText(for asset: AVAsset) async -> String {
         do {
             let duration = try await asset.load(.duration)
