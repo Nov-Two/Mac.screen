@@ -43,6 +43,20 @@ struct PreferencesView: View {
                 )
             )
 
+            Button {
+                store.openUserVideoDirectory()
+            } label: {
+                Label("打开用户素材目录", systemImage: "folder")
+            }
+            .pointingHandCursor()
+
+            Button {
+                store.openBundledVideoDirectory()
+            } label: {
+                Label("打开内置素材目录", systemImage: "shippingbox")
+            }
+            .pointingHandCursor()
+
             if let errorMessage = store.errorMessage {
                 Text(errorMessage)
                     .font(.caption)

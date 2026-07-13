@@ -242,6 +242,17 @@ final class WallpaperStore: ObservableObject {
         NSWorkspace.shared.open(directory)
     }
 
+    func openUserVideoDirectory() {
+        let directory = WallpaperLibrary.userVideoDirectory
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(directory)
+    }
+
+    func openBundledVideoDirectory() {
+        let directory = WallpaperLibrary.bundledVideoDirectory
+        NSWorkspace.shared.open(directory)
+    }
+
     private func preferredInitialSelection(from items: [WallpaperItem]) -> WallpaperItem? {
         guard !items.isEmpty else { return nil }
 
