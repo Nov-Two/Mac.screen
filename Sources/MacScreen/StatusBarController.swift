@@ -25,11 +25,9 @@ final class StatusBarController: NSObject {
         self.store = store
         self.wallpaperController = wallpaperController
 
-        let statusItem = statusItem ?? NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let statusItem = statusItem ?? NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         self.statusItem = statusItem
-        statusItem.button?.image = NSImage(systemSymbolName: "play.rectangle.fill", accessibilityDescription: AppConfiguration.appName)
-        statusItem.button?.title = " \(AppConfiguration.appName)"
-        statusItem.button?.imagePosition = .imageLeading
+        statusItem.button?.image = menuBarIcon()
 
         cancellables.removeAll()
 
@@ -61,8 +59,6 @@ final class StatusBarController: NSObject {
         let restoresOnLaunch = store?.restoresLastWallpaperOnLaunch == true
         let opensAtLogin = store?.opensAtLogin == true
         let pausesOnLowBattery = store?.pausesOnLowBattery == true
-
-        updateStatusButton(activeTitle: activeTitle, isPaused: isPaused)
 
         let statusTitle: String
         if let activeTitle {
@@ -189,20 +185,25 @@ final class StatusBarController: NSObject {
         }
     }
 
-    private func updateStatusButton(activeTitle: String?, isPaused: Bool) {
-        guard let button = statusItem?.button else { return }
-
-        if let activeTitle {
-            button.image = NSImage(
-                systemSymbolName: isPaused ? "pause.circle.fill" : "play.circle.fill",
-                accessibilityDescription: AppConfiguration.appName
-            )
-            button.title = " \(activeTitle)"
+    private func menuBarIcon() -> NSImage {
+        let targetSize = NSSize(width: 18, height: 18)
+        let source: NSImage
+        if let url = Bundle.main.url(forResource: "MacScreenIcon", withExtension: "icns"),
+           let loaded = NSImage(contentsOf: url) {
+            source = loaded
         } else {
-            button.image = NSImage(systemSymbolName: "play.rectangle.fill", accessibilityDescription: AppConfiguration.appName)
-            button.title = " \(AppConfiguration.appName)"
+            source = NSImage(systemSymbolName: "play.rectangle.fill", accessibilityDescription: nil) ?? NSImage()
         }
-        button.imagePosition = .imageLeading
+
+        let icon = NSImage(size: targetSize)
+        icon.lockFocus()
+        NSGraphicsContext.current?.imageInterpolation = .high
+        source.draw(in: NSRect(origin: .zero, size: targetSize),
+                    from: NSRect(origin: .zero, size: source.size),
+                    operation: .copy,
+                    fraction: 1.0)
+        icon.unlockFocus()
+        return icon
     }
 
     private func menuItem(_ title: String, action: Selector, keyEquivalent: String) -> NSMenuItem {
