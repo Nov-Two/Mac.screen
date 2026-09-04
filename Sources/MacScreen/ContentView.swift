@@ -12,19 +12,21 @@ struct ContentView: View {
     @State private var selectedCategory = "全部"
     @State private var hoveredItemID: URL?
 
-    private let cardWidth: CGFloat = 286
-    private let cardHeight: CGFloat = 161
-    private let columns = Array(repeating: GridItem(.fixed(286), spacing: 18), count: 3)
+    private let cardWidth: CGFloat = AppTheme.cardWidth
+    private let cardHeight: CGFloat = AppTheme.cardHeight
+    private let columns = [GridItem(.adaptive(minimum: AppTheme.cardWidth), spacing: 16)]
     private let mainCategories = ["二次元", "风景", "人物", "其他"]
 
     var body: some View {
         VStack(spacing: 0) {
-            topArea
+            header
+            secondaryToolbar
             content
             footer
         }
-        .frame(minWidth: 980, minHeight: 600)
+        .frame(minWidth: 980, minHeight: 640)
         .background(AppTheme.background)
+        .tint(AppTheme.accent)
         .onChange(of: enablesWallpaperCardHoverEffect) { _, enabled in
             UserDefaults.standard.set(enabled, forKey: UserDefaultsKeys.enablesWallpaperCardHoverEffect)
         }
@@ -40,39 +42,24 @@ struct ContentView: View {
         }
     }
 
-    private var toolbar: some View {
+    // MARK: - 头部（MacChromeHeader）
+
+    private var header: some View {
         HStack(spacing: 12) {
             AppIconView()
 
-            TextField("搜索标题或标签", text: $searchText)
-                .textFieldStyle(.roundedBorder)
-                .font(.system(size: 14))
-                .frame(width: 250)
-                .help("按素材标题或自动标签搜索")
+            VStack(alignment: .leading, spacing: 1) {
+                Text(AppConfiguration.appName)
+                    .font(.system(size: 13, weight: .semibold))
+                Text("动态壁纸")
+                    .font(.system(size: 11))
+                    .foregroundStyle(AppTheme.secondaryText)
+            }
 
             Spacer()
 
-            ToolbarIconButton(
-                systemImage: "sparkles",
-                title: "发现更多",
-                help: "打开 haowallpaper.com 下载更多壁纸",
-                action: openWallpaperWebsite
-            )
-
-            ToolbarIconButton(
-                systemImage: "plus",
-                title: "添加",
-                help: "导入本地 mp4、mov 或 m4v 视频"
-            ) {
-                Task {
-                    await store.importVideos()
-                }
-            }
-            .disabled(store.isLoading)
-
-            ToolbarIconButton(
+            HeaderIconButton(
                 systemImage: "arrow.clockwise",
-                title: "初始化",
                 help: "恢复被隐藏的内置素材，不会删除自定义素材"
             ) {
                 Task {
@@ -81,16 +68,8 @@ struct ContentView: View {
             }
             .disabled(store.isLoading)
 
-            ToolbarToggleButton(
-                systemImage: "sparkles",
-                title: "动态效果",
-                help: "控制素材卡片的 3D hover 动效。关闭后会停用连续鼠标跟踪，减轻卡顿。",
-                isOn: $enablesWallpaperCardHoverEffect
-            )
-
-            ToolbarIconButton(
+            HeaderIconButton(
                 systemImage: "trash",
-                title: "删除",
                 help: "删除选中的素材。按住 Command 点击多个素材可批量选择后删除。",
                 role: .destructive,
                 action: requestDeletion
@@ -99,41 +78,88 @@ struct ContentView: View {
 
             GitHubIconLink()
         }
-        .padding(.horizontal, 22)
-        .padding(.top, 14)
-        .padding(.bottom, 10)
-        .background(.bar)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(AppTheme.hairlineBorder)
+                .frame(height: 1)
+        }
     }
 
-    private var categoryBar: some View {
-        HStack(spacing: 10) {
+    // MARK: - 次级工具栏（搜索 + 分段标签 + 操作）
+
+    private var secondaryToolbar: some View {
+        HStack(spacing: 16) {
+            searchField
+
+            Spacer()
+
+            SegmentedTagControl(
+                options: allCategories,
+                selection: $selectedCategory,
+                iconFor: categoryIcon
+            )
+
+            Spacer()
+
             HStack(spacing: 8) {
-                categoryButton("全部")
-                categoryButton("收藏")
-            }
-            .fixedSize()
+                ToolbarIconButton(
+                    systemImage: "sparkles",
+                    title: "发现更多",
+                    help: "打开 haowallpaper.com 下载更多壁纸",
+                    action: openWallpaperWebsite
+                )
 
-            Divider()
-                .frame(height: 18)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(scrollableCategories, id: \.self) { category in
-                        categoryButton(category)
+                ToolbarIconButton(
+                    systemImage: "plus",
+                    title: "添加",
+                    help: "导入本地 mp4、mov 或 m4v 视频"
+                ) {
+                    Task {
+                        await store.importVideos()
                     }
                 }
+                .disabled(store.isLoading)
+
+                ToolbarToggleButton(
+                    systemImage: "sparkles",
+                    title: "动态效果",
+                    help: "控制素材卡片的 3D hover 动效。关闭后会停用连续鼠标跟踪，减轻卡顿。",
+                    isOn: $enablesWallpaperCardHoverEffect
+                )
             }
         }
-        .padding(.horizontal, 22)
-        .padding(.bottom, 10)
-        .background(.bar)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(AppTheme.hairlineBorder)
+                .frame(height: 1)
+        }
     }
 
-    private var topArea: some View {
-        VStack(spacing: 0) {
-            toolbar
-            categoryBar
+    private var searchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 12))
+                .foregroundStyle(AppTheme.secondaryText)
+
+            TextField("搜索壁纸或标签...", text: $searchText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13))
+                .frame(width: 220)
+                .help("按素材标题或自动标签搜索")
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(AppTheme.cardSurface, in: RoundedRectangle(cornerRadius: AppTheme.controlCornerRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: AppTheme.controlCornerRadius, style: .continuous)
+                .stroke(AppTheme.hairlineBorder, lineWidth: 1)
+        )
     }
 
     private var content: some View {
@@ -199,8 +225,8 @@ struct ContentView: View {
                         }
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 20)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 24)
                 }
                 .scrollContentBackground(.hidden)
             }
@@ -208,58 +234,89 @@ struct ContentView: View {
     }
 
     private var footer: some View {
-        HStack(spacing: 12) {
-            statusText
+        HStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 2) {
+                statusText
 
-            Text("显示 \(filteredItems.count) / 共 \(store.items.count) 个素材")
-                .font(.system(size: 13))
-                .foregroundStyle(.tertiary)
+                Text("显示 \(filteredItems.count) / 共 \(store.items.count) 个素材")
+                    .font(.system(size: 11))
+                    .foregroundStyle(AppTheme.secondaryText)
+            }
+
+            Spacer()
 
             volumeControl
 
             Spacer()
 
-            Button {
-                wallpaperController.stop()
-                store.clearLastWallpaper()
-            } label: {
-                Label("停止", systemImage: "stop.fill")
-            }
-            .disabled(wallpaperController.activeURL == nil)
-            .pointingHandCursor()
+            HStack(spacing: 6) {
+                mediaControlButton(
+                    "stop.fill",
+                    help: "停止",
+                    isDisabled: wallpaperController.activeURL == nil
+                ) {
+                    wallpaperController.stop()
+                    store.clearLastWallpaper()
+                }
 
-            Button {
-                wallpaperController.togglePause()
-            } label: {
-                Label(
-                    wallpaperController.isPaused ? "继续" : "暂停",
-                    systemImage: wallpaperController.isPaused ? "play.fill" : "pause.fill"
-                )
-            }
-            .disabled(wallpaperController.activeURL == nil)
-            .pointingHandCursor()
+                mediaControlButton(
+                    wallpaperController.isPaused ? "play.fill" : "pause.fill",
+                    help: wallpaperController.isPaused ? "继续" : "暂停",
+                    isDisabled: wallpaperController.activeURL == nil
+                ) {
+                    wallpaperController.togglePause()
+                }
 
-            Button {
-                applyWallpaper(store.selectNextItem(after: wallpaperController.activeURL))
-            } label: {
-                Label("下一个", systemImage: "forward.fill")
-            }
-            .disabled(store.items.isEmpty)
-            .pointingHandCursor()
+                mediaControlButton(
+                    "forward.fill",
+                    help: "下一个",
+                    isDisabled: store.items.isEmpty
+                ) {
+                    applyWallpaper(store.selectNextItem(after: wallpaperController.activeURL))
+                }
 
-            Button {
-                applyWallpaper(store.previewItem)
-            } label: {
-                Label("应用选中", systemImage: "play.rectangle.fill")
+                Button {
+                    applyWallpaper(store.previewItem)
+                } label: {
+                    Label("应用选中", systemImage: "play.rectangle.fill")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(store.previewItem == nil)
+                .pointingHandCursor()
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(store.previewItem == nil)
-            .pointingHandCursor()
         }
         .controlSize(.small)
-        .padding(.horizontal, 22)
-        .padding(.vertical, 12)
-        .background(.bar)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(AppTheme.hairlineBorder)
+                .frame(height: 1)
+        }
+    }
+
+    private func mediaControlButton(
+        _ systemImage: String,
+        help: String,
+        isDisabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 12, weight: .medium))
+                .frame(width: 26, height: 26)
+                .background(
+                    Color.primary.opacity(0.08),
+                    in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+                )
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.primary)
+        .disabled(isDisabled)
+        .help(help)
+        .pointingHandCursor()
     }
 
     private var volumeControl: some View {
@@ -267,15 +324,15 @@ struct ContentView: View {
             Image(systemName: AppConfiguration.volumeSymbolName(for: wallpaperController.volume))
                 .font(.system(size: 11))
                 .frame(width: 16)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppTheme.secondaryText)
 
             Slider(value: $wallpaperController.volume)
-                .frame(width: 100)
+                .frame(width: 120)
                 .controlSize(.mini)
 
             Text("\(Int(wallpaperController.volume * 100))%")
                 .font(.system(size: 11, weight: .medium).monospacedDigit())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppTheme.secondaryText)
                 .lineLimit(1)
                 .frame(width: 36, alignment: .trailing)
         }
@@ -291,8 +348,8 @@ struct ContentView: View {
                 Text("选择素材后可应用到桌面。")
             }
         }
-        .font(.system(size: 14))
-        .foregroundStyle(.secondary)
+        .font(.system(size: 13))
+        .foregroundStyle(AppTheme.secondaryText)
         .lineLimit(1)
     }
 
@@ -312,8 +369,19 @@ struct ContentView: View {
         }
     }
 
-    private var scrollableCategories: [String] {
-        mainCategories
+    private var allCategories: [String] {
+        ["全部", "收藏"] + mainCategories
+    }
+
+    private func categoryIcon(_ category: String) -> String? {
+        switch category {
+        case "全部":
+            return "square.grid.2x2.fill"
+        case "收藏":
+            return "heart.fill"
+        default:
+            return nil
+        }
     }
 
     private var emptyStateTitle: String {
@@ -338,51 +406,6 @@ struct ContentView: View {
         }
 
         return "请选择其他分类，或导入更多动态壁纸。"
-    }
-
-    private func categoryButton(_ category: String) -> some View {
-        Button {
-            selectedCategory = category
-        } label: {
-            categoryLabel(category)
-                .font(.system(size: 14, weight: .medium))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .frame(height: 30)
-                .background(
-                    selectedCategory == category ? Color.accentColor.opacity(0.16) : Color.clear,
-                    in: Capsule()
-                )
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(selectedCategory == category ? .primary : .secondary)
-        .help(categoryHelp(category))
-        .pointingHandCursor()
-    }
-
-    private func categoryHelp(_ category: String) -> String {
-        switch category {
-        case "全部":
-            return "显示所有素材"
-        case "收藏":
-            return "只显示已收藏素材"
-        default:
-            return "筛选 \(category) 分类素材"
-        }
-    }
-
-    private func categoryLabel(_ category: String) -> some View {
-        HStack(spacing: 5) {
-            if category == "全部" {
-                Image(systemName: "square.grid.2x2.fill")
-                    .font(.system(size: 11, weight: .semibold))
-            } else if category == "收藏" {
-                Image(systemName: "heart.fill")
-                    .font(.system(size: 11, weight: .semibold))
-            }
-
-            Text(category)
-        }
     }
 
     private func select(_ item: WallpaperItem) {

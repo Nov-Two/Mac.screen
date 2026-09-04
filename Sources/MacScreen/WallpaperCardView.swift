@@ -24,34 +24,25 @@ struct WallpaperCard: View {
 
     private let hoverConfiguration = AppConfiguration.wallpaperCardHover
 
+    private var artworkHeight: CGFloat { AppTheme.cardArtworkHeight }
+    private var cornerRadius: CGFloat { AppTheme.cardCornerRadius }
+
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            thumbnail
-                .frame(width: width, height: height)
+        VStack(spacing: 0) {
+            artwork
+                .frame(width: width, height: artworkHeight)
 
-            if isHovering || isSelected || isActive {
-                overlay
-                    .frame(width: width, height: height)
-                    .transition(.opacity)
-            }
-
-            if isActive {
-                activeBadge
-                    .padding(10)
-                    .frame(width: width, height: height, alignment: .topTrailing)
-            } else if isFavorite {
-                favoriteBadge
-                    .padding(10)
-                    .frame(width: width, height: height, alignment: .topTrailing)
-            }
+            footer
+                .frame(width: width, height: height - artworkHeight)
         }
         .frame(width: width, height: height)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(AppTheme.cardSurface)
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .stroke(borderColor, lineWidth: isSelected || isActive ? 2 : 1)
         }
-        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .onTapGesture(perform: onSelect)
         .pointingHandCursor()
         .rotation3DEffect(
@@ -145,7 +136,7 @@ struct WallpaperCard: View {
                 Image(nsImage: image)
                     .resizable()
                     .scaledToFill()
-                    .frame(width: width, height: height)
+                    .frame(width: width, height: artworkHeight)
                     .scaleEffect(isMotionEnabled ? hoverMotion.mediaScale : AppConfiguration.wallpaperCardHover.baseMediaScale)
                     .offset(
                         x: isMotionEnabled ? hoverMotion.mediaOffset.width : 0,
@@ -167,97 +158,103 @@ struct WallpaperCard: View {
                     ],
                     center: hoverMotion.highlightCenter,
                     startRadius: 6,
-                    endRadius: max(width, height) * 0.9
+                    endRadius: max(width, artworkHeight) * 0.9
                 )
                 .blendMode(.screen)
                 .allowsHitTesting(false)
             }
         }
+        .clipped()
     }
 
-    private var overlay: some View {
-        ZStack(alignment: .bottom) {
-            LinearGradient(
-                colors: [
-                    .black.opacity(0.02),
-                    .black.opacity(0.18),
-                    .black.opacity(0.72)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+    private var artwork: some View {
+        ZStack {
+            thumbnail
 
-            HStack(alignment: .bottom, spacing: 10) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(item.mainCategory)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.92))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(.white.opacity(0.18), in: Capsule())
-                        .frame(height: 22, alignment: .leading)
-
-                    Text(item.title)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                        .frame(height: 20)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    HStack(spacing: 10) {
-                        metadata(item.resolutionText, "rectangle")
-                        metadata(item.durationText, "clock")
-                    }
-                    .frame(height: 18, alignment: .leading)
-                }
-                .frame(width: width - 112, alignment: .leading)
-                .clipped()
-
-                HStack(spacing: 7) {
-                    Button(action: onFavorite) {
-                        Image(systemName: isFavorite ? "heart.fill" : "heart")
-                            .frame(width: 16, height: 16)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .frame(width: 32, height: 26)
-                    .help(isFavorite ? "取消收藏" : "收藏这个素材")
-                    .pointingHandCursor()
-
-                    Button(action: onApply) {
-                        Image(systemName: "play.fill")
-                            .frame(width: 16, height: 16)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                    .frame(width: 32, height: 26)
-                    .help("把这个素材应用到桌面")
-                    .pointingHandCursor()
-                }
-                .frame(width: 72, height: 26, alignment: .trailing)
-                .offset(
-                    x: isMotionEnabled ? hoverMotion.actionsOffset.width : 0,
-                    y: isMotionEnabled ? hoverMotion.actionsOffset.height : 0
-                )
+            // 左上角分类标签
+            if !item.mainCategory.isEmpty {
+                Text(item.mainCategory)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(.black.opacity(0.45), in: Capsule())
+                    .padding(8)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
-            .frame(width: width - 24, alignment: .bottomLeading)
-            .padding(.horizontal, 12)
-            .padding(.bottom, 11)
+
+            // 右上角徽章：使用中优先，其次收藏
+            if isActive {
+                activeBadge
+                    .padding(8)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            } else if isFavorite {
+                favoriteBadge
+                    .padding(8)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            }
+
+            // 居中 hover 播放按钮
+            if isHovering {
+                Button(action: onApply) {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(.black.opacity(0.5), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .help("把这个素材应用到桌面")
+                .pointingHandCursor()
+                .transition(.opacity)
+            }
+        }
+    }
+
+    private var footer: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                HStack(spacing: 8) {
+                    metadata(item.resolutionText, "rectangle")
+                    metadata(item.durationText, "clock")
+                }
+            }
             .offset(
                 x: isMotionEnabled ? hoverMotion.contentOffset.width : 0,
                 y: isMotionEnabled ? hoverMotion.contentOffset.height : 0
             )
+
+            Spacer()
+
+            Button(action: onFavorite) {
+                Image(systemName: isFavorite ? "heart.fill" : "heart")
+                    .font(.system(size: 13))
+                    .foregroundStyle(isFavorite ? .pink : AppTheme.secondaryText)
+                    .frame(width: 24, height: 24)
+            }
+            .buttonStyle(.plain)
+            .help(isFavorite ? "取消收藏" : "收藏这个素材")
+            .pointingHandCursor()
+            .offset(
+                x: isMotionEnabled ? hoverMotion.actionsOffset.width : 0,
+                y: isMotionEnabled ? hoverMotion.actionsOffset.height : 0
+            )
         }
+        .padding(.horizontal, 12)
     }
 
     private var activeBadge: some View {
-        Label("使用中", systemImage: "checkmark.circle.fill")
-            .font(.caption.weight(.semibold))
+        Image(systemName: "checkmark.circle.fill")
+            .font(.system(size: 20, weight: .semibold))
             .foregroundStyle(.white)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
-            .background(.black.opacity(0.45), in: Capsule())
+            .background(.black.opacity(0.4), in: Circle())
+            .help("使用中")
     }
 
     private var favoriteBadge: some View {
@@ -269,9 +266,9 @@ struct WallpaperCard: View {
     }
 
     private var borderColor: Color {
-        if isActive { return .green.opacity(0.8) }
-        if isSelected { return .blue.opacity(0.75) }
-        return .white.opacity(isHovering ? 0.7 : 0.24)
+        if isActive { return AppTheme.accent }
+        if isSelected { return AppTheme.accent.opacity(0.6) }
+        return AppTheme.hairlineBorder
     }
 
     private var shadowOpacity: CGFloat {
@@ -287,7 +284,7 @@ struct WallpaperCard: View {
     private func metadata(_ text: String, _ icon: String) -> some View {
         Label(text, systemImage: icon)
             .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(.white.opacity(0.88))
+            .foregroundStyle(AppTheme.secondaryText)
             .lineLimit(1)
             .truncationMode(.tail)
             .fixedSize(horizontal: true, vertical: false)
