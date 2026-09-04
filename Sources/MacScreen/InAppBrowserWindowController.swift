@@ -14,25 +14,12 @@ final class InAppBrowserWindowController: NSObject, NSWindowDelegate, WKUIDelega
     private var urlObservation: NSKeyValueObservation?
     private var titleObservation: NSKeyValueObservation?
     private var downloadDestinations: [ObjectIdentifier: URL] = [:]
-    private var pendingRequestID: UUID?
     private var onDownloadedResource: ((URL) -> Void)?
 
     func show(url: URL, title: String, onDownloadedResource: @escaping (URL) -> Void) {
-        let requestID = UUID()
-        pendingRequestID = requestID
         closeCurrentWindow()
         self.onDownloadedResource = onDownloadedResource
-
-        let dataStore = WKWebsiteDataStore.default()
-        dataStore.removeData(
-            ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(),
-            modifiedSince: .distantPast
-        ) { [weak self] in
-            Task { @MainActor [weak self] in
-                guard let self, self.pendingRequestID == requestID else { return }
-                self.openFreshWindow(url: url, title: title)
-            }
-        }
+        openFreshWindow(url: url, title: title)
     }
 
     private func openFreshWindow(url: URL, title: String) {
@@ -323,7 +310,7 @@ final class InAppBrowserWindowController: NSObject, NSWindowDelegate, WKUIDelega
     ) {
         do {
             let directory = try downloadsDirectory()
-            let destinationURL = uniqueDownloadURL(
+            let destinationURL = FileSystemHelper.uniqueFileURL(
                 for: sanitizedFilename(suggestedFilename),
                 in: directory
             )
@@ -349,9 +336,7 @@ final class InAppBrowserWindowController: NSObject, NSWindowDelegate, WKUIDelega
     }
 
     private func downloadsDirectory() throws -> URL {
-        let directory = AppConfiguration.applicationSupportBaseDirectory
-            .appendingPathComponent(AppConfiguration.applicationSupportDirectoryName, isDirectory: true)
-            .appendingPathComponent(AppConfiguration.downloadDirectoryName, isDirectory: true)
+        let directory = AppConfiguration.downloadsDirectory
 
         try FileManager.default.createDirectory(
             at: directory,
@@ -359,23 +344,6 @@ final class InAppBrowserWindowController: NSObject, NSWindowDelegate, WKUIDelega
         )
 
         return directory
-    }
-
-    private func uniqueDownloadURL(for filename: String, in directory: URL) -> URL {
-        let fileManager = FileManager.default
-        let sourceURL = URL(fileURLWithPath: filename)
-        let baseName = sourceURL.deletingPathExtension().lastPathComponent
-        let pathExtension = sourceURL.pathExtension
-
-        var destinationURL = directory.appendingPathComponent(filename)
-        var index = 2
-        while fileManager.fileExists(atPath: destinationURL.path) {
-            let candidateName = pathExtension.isEmpty ? "\(baseName) \(index)" : "\(baseName) \(index).\(pathExtension)"
-            destinationURL = directory.appendingPathComponent(candidateName)
-            index += 1
-        }
-
-        return destinationURL
     }
 
     private func sanitizedFilename(_ filename: String) -> String {

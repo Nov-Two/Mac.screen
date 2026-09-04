@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-09-04
+
+- 用户导入视频的缩略图首次生成后缓存到 `Application Support/MacScreen/Thumbnails`，后续启动直接读缓存，避免每次启动重复解码
+- 移除内置浏览器打开前对 `WKWebsiteDataStore.default()` 的无意义清缓存操作（实际使用非持久化 store）
+- 文件名去重统一到 `FileSystemHelper.uniqueFileURL`，替换原来分散在 `WallpaperLibrary` 和 `InAppBrowserWindowController` 的两份实现
+- 音量图标映射统一到 `AppConfiguration.volumeSymbolName`，消除主窗口、菜单栏、桌面叠加层的重复判断
+- 下载目录路径统一到 `AppConfiguration.downloadsDirectory`
+- `applyWallpaper` 收敛为 `WallpaperStore.applyWallpaper(_:with:)` 单一入口，消除 `ContentView` 与 `MacScreenApp` 的重复实现
+- `WallpaperStore` 的加载/导入/删除/恢复等刷新流程收敛为 `refreshItems(emptyMessage:selection:)`
+- 拆分 `ContentView.swift`（约 1200 行）为 `ContentView` + `WallpaperCardView` + `ToolbarViews` + `PointingHandCursorModifier`
+- 抽出 `WallpaperDialogs`，把 `NSOpenPanel`、`NSAlert` 弹窗职责从 `WallpaperStore` 中剥离
+- `WallpaperItem` 的分类与标签由“每次渲染现算”改为构造时预计算并存储
+- 删除死代码 `availableCategories` 与 `deleteButtonTitle`
+- 新增 `FileSystemHelper` 与 `WallpaperItem` 分类/标签的单元测试
+
 ## 2026-07-13
 
 - 新增全局音量控制功能：主窗口底部、桌面壁纸叠加层、菜单栏常驻入口三处均提供音量滑块

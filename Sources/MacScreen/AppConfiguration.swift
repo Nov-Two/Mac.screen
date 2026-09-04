@@ -88,6 +88,22 @@ enum AppConfiguration {
             in: .userDomainMask
         ).first ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support", isDirectory: true)
     }
+
+    static var downloadsDirectory: URL {
+        applicationSupportBaseDirectory
+            .appendingPathComponent(applicationSupportDirectoryName, isDirectory: true)
+            .appendingPathComponent(downloadDirectoryName, isDirectory: true)
+    }
+
+    static func volumeSymbolName(for volume: Float) -> String {
+        if volume == 0 {
+            return "speaker.slash.fill"
+        } else if volume < 0.5 {
+            return "speaker.wave.1.fill"
+        }
+
+        return "speaker.wave.3.fill"
+    }
 }
 
 struct WallpaperCardHoverConfiguration {

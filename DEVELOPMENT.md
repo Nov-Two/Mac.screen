@@ -34,6 +34,11 @@
 │       ├── AppDelegate.swift       # AppKit 生命周期补充
 │       ├── AppConfiguration.swift  # 运行时配置集中管理
 │       ├── ContentView.swift       # 主界面
+│       ├── WallpaperCardView.swift # 素材卡片及 3D hover 动效
+│       ├── ToolbarViews.swift      # 工具栏按钮、图标、主题等小组件
+│       ├── PointingHandCursorModifier.swift # 小手光标修饰器
+│       ├── WallpaperDialogs.swift  # 文件选择面板与提示弹窗
+│       ├── FileSystemHelper.swift  # 文件名去重等文件系统工具
 │       ├── PreferencesView.swift   # macOS 原生偏好设置页
 │       ├── StatusBarController.swift # 菜单栏常驻入口
 │       ├── SoftwareUpdateController.swift # Sparkle 自动更新入口

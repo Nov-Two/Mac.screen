@@ -1,6 +1,5 @@
 import AppKit
 import Foundation
-import UniformTypeIdentifiers
 
 @MainActor
 final class WallpaperStore: ObservableObject {
@@ -32,31 +31,22 @@ final class WallpaperStore: ObservableObject {
         isLoading = true
         errorMessage = nil
 
-        let loadedItems = await service.loadItems()
-        items = loadedItems
-        selectedItem = preferredInitialSelection(from: loadedItems)
-        selectedItems = selectedItem.map { [$0] } ?? []
-        errorMessage = loadedItems.isEmpty ? "没有在素材目录中找到 mp4 文件。" : nil
+        await refreshItems(emptyMessage: "没有在素材目录中找到 mp4 文件。") {
+            preferredInitialSelection(from: $0)
+        }
+
         isLoading = false
     }
 
     func importVideos() async {
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = false
-        panel.canChooseFiles = true
-        panel.allowedContentTypes = [.mpeg4Movie, .quickTimeMovie, .movie]
-        panel.prompt = "导入"
-        panel.message = "选择一个或多个视频作为自定义动态壁纸素材。"
-
-        guard panel.runModal() == .OK else { return }
+        guard let urls = WallpaperDialogs.runVideoOpenPanel() else { return }
 
         let duplicateURLs = WallpaperLibrary.findDuplicateSourceURLs(
-            in: panel.urls,
+            in: urls,
             directory: WallpaperLibrary.userVideoDirectory
         )
         if !duplicateURLs.isEmpty {
-            showDuplicateAlert(duplicateURLs: duplicateURLs)
+            WallpaperDialogs.showDuplicateAlert(duplicateURLs)
             return
         }
 
@@ -65,18 +55,16 @@ final class WallpaperStore: ObservableObject {
         importMessage = nil
 
         do {
-            let importResult = try await service.importVideos(from: panel.urls)
-            let loadedItems = await service.loadItems()
-            items = loadedItems
-            selectedItem = preferredSelection(afterImporting: importResult.importedURLs, from: loadedItems)
-            selectedItems = selectedItem.map { [$0] } ?? []
-            errorMessage = loadedItems.isEmpty ? "没有在素材目录中找到 mp4 文件。" : nil
+            let importResult = try await service.importVideos(from: urls)
+            await refreshItems(emptyMessage: "没有在素材目录中找到 mp4 文件。") {
+                preferredSelection(afterImporting: importResult.importedURLs, from: $0)
+            }
             importMessage = importMessage(
                 importedCount: importResult.importedURLs.count,
                 rejectedLowResolutionFilenames: importResult.rejectedLowResolutionFilenames,
                 emptyMessage: "没有导入支持的视频文件。"
             )
-            showLowResolutionAlertIfNeeded(importResult.rejectedLowResolutionFilenames)
+            WallpaperDialogs.showLowResolutionAlert(importResult.rejectedLowResolutionFilenames)
         } catch {
             errorMessage = "导入失败：\(error.localizedDescription)"
         }
@@ -90,7 +78,7 @@ final class WallpaperStore: ObservableObject {
             directory: WallpaperLibrary.userVideoDirectory
         )
         if !duplicateURLs.isEmpty {
-            showDuplicateAlert(duplicateURLs: duplicateURLs)
+            WallpaperDialogs.showDuplicateAlert(duplicateURLs)
             return
         }
 
@@ -100,11 +88,9 @@ final class WallpaperStore: ObservableObject {
 
         do {
             let importResult = try await service.importResources(from: [url])
-            let loadedItems = await service.loadItems()
-            items = loadedItems
-            selectedItem = preferredSelection(afterImporting: importResult.importedURLs, from: loadedItems)
-            selectedItems = selectedItem.map { [$0] } ?? []
-            errorMessage = loadedItems.isEmpty ? "没有在素材目录中找到视频文件。" : nil
+            await refreshItems(emptyMessage: "没有在素材目录中找到视频文件。") {
+                preferredSelection(afterImporting: importResult.importedURLs, from: $0)
+            }
             importMessage = importMessage(
                 importedCount: importResult.importedURLs.count,
                 rejectedLowResolutionFilenames: importResult.rejectedLowResolutionFilenames,
@@ -112,7 +98,7 @@ final class WallpaperStore: ObservableObject {
                 successPrefix: "下载完成，已自动导入"
             )
             cleanDownloadedResourceIfNeeded(at: url, didImport: !importResult.importedURLs.isEmpty)
-            showLowResolutionAlertIfNeeded(importResult.rejectedLowResolutionFilenames)
+            WallpaperDialogs.showLowResolutionAlert(importResult.rejectedLowResolutionFilenames)
         } catch {
             errorMessage = "自动导入下载资源失败：\(error.localizedDescription)"
         }
@@ -137,11 +123,9 @@ final class WallpaperStore: ObservableObject {
                 service.lastWallpaperPath = nil
             }
 
-            let loadedItems = await service.loadItems()
-            items = loadedItems
-            selectedItem = preferredSelection(afterDeleting: itemsToDelete, from: loadedItems)
-            selectedItems = selectedItem.map { [$0] } ?? []
-            errorMessage = loadedItems.isEmpty ? "没有在素材目录中找到视频文件。" : nil
+            await refreshItems(emptyMessage: "没有在素材目录中找到视频文件。") {
+                preferredSelection(afterDeleting: itemsToDelete, from: $0)
+            }
             importMessage = message
         } catch {
             errorMessage = "删除失败：\(error.localizedDescription)"
@@ -157,11 +141,9 @@ final class WallpaperStore: ObservableObject {
 
         service.restoreBundledVideos()
 
-        let loadedItems = await service.loadItems()
-        items = loadedItems
-        selectedItem = preferredInitialSelection(from: loadedItems)
-        selectedItems = selectedItem.map { [$0] } ?? []
-        errorMessage = loadedItems.isEmpty ? "没有在素材目录中找到视频文件。" : nil
+        await refreshItems(emptyMessage: "没有在素材目录中找到视频文件。") {
+            preferredInitialSelection(from: $0)
+        }
         importMessage = "已初始化内置素材。"
         isLoading = false
     }
@@ -200,6 +182,18 @@ final class WallpaperStore: ObservableObject {
 
     func rememberLastWallpaper(_ url: URL) {
         service.lastWallpaperPath = url.path
+    }
+
+    /// 统一的应用入口：选中素材、应用为壁纸，并根据结果记录/清除“上次壁纸”。
+    func applyWallpaper(_ item: WallpaperItem?, with controller: WallpaperWindowController) {
+        guard let item else { return }
+
+        select(item)
+        if controller.apply(videoURL: item.url) {
+            rememberLastWallpaper(item.url)
+        } else {
+            clearLastWallpaper()
+        }
     }
 
     func toggleRestoresLastWallpaperOnLaunch() {
@@ -249,9 +243,7 @@ final class WallpaperStore: ObservableObject {
     }
 
     func downloadsDirectory() -> URL {
-        AppConfiguration.applicationSupportBaseDirectory
-            .appendingPathComponent(AppConfiguration.applicationSupportDirectoryName, isDirectory: true)
-            .appendingPathComponent(AppConfiguration.downloadDirectoryName, isDirectory: true)
+        AppConfiguration.downloadsDirectory
     }
 
     func openDownloadsDirectory() {
@@ -273,6 +265,17 @@ final class WallpaperStore: ObservableObject {
 
     func openItemInFinder(_ item: WallpaperItem) {
         NSWorkspace.shared.activateFileViewerSelecting([item.url])
+    }
+
+    private func refreshItems(
+        emptyMessage: String,
+        selection: ([WallpaperItem]) -> WallpaperItem?
+    ) async {
+        let loadedItems = await service.loadItems()
+        items = loadedItems
+        selectedItem = selection(loadedItems)
+        selectedItems = selectedItem.map { [$0] } ?? []
+        errorMessage = loadedItems.isEmpty ? emptyMessage : nil
     }
 
     private func preferredInitialSelection(from items: [WallpaperItem]) -> WallpaperItem? {
@@ -321,34 +324,6 @@ final class WallpaperStore: ObservableObject {
         }
 
         return parts.joined(separator: " ")
-    }
-
-    private func showLowResolutionAlertIfNeeded(_ filenames: [String]) {
-        guard !filenames.isEmpty else { return }
-
-        let visibleNames = filenames.prefix(6).joined(separator: "\n")
-        let remainingCount = max(0, filenames.count - 6)
-        let remainingText = remainingCount > 0 ? "\n等 \(filenames.count) 个文件" : ""
-
-        let alert = NSAlert()
-        alert.messageText = "视频分辨率太低，已跳过导入"
-        alert.informativeText = "\(visibleNames)\(remainingText)\n\n请使用至少 \(AppConfiguration.minimumImportedVideoWidth)x\(AppConfiguration.minimumImportedVideoHeight) 的视频。低分辨率视频即使强行放大，也无法恢复原本不存在的画面细节，作为桌面壁纸会明显模糊。"
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "知道了")
-        alert.runModal()
-    }
-
-    private func showDuplicateAlert(duplicateURLs: [URL]) {
-        let visibleNames = duplicateURLs.prefix(6).map(\.lastPathComponent).joined(separator: "\n")
-        let remainingCount = max(0, duplicateURLs.count - 6)
-        let remainingText = remainingCount > 0 ? "\n等 \(duplicateURLs.count) 个文件" : ""
-
-        let alert = NSAlert()
-        alert.messageText = "视频已存在，已跳过导入"
-        alert.informativeText = "\(visibleNames)\(remainingText)\n\n以下文件已存在于素材目录中，无需重复导入。"
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "知道了")
-        alert.runModal()
     }
 
     private func cleanDownloadedResourceIfNeeded(at url: URL, didImport: Bool) {

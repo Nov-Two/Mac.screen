@@ -14,14 +14,7 @@ final class VolumeOverlayView: NSView {
     var onVolumeChanged: ((Float) -> Void)?
 
     private static func icon(for volume: Float) -> NSImage? {
-        let symbolName: String
-        if volume == 0 {
-            symbolName = "speaker.slash.fill"
-        } else if volume < 0.5 {
-            symbolName = "speaker.wave.1.fill"
-        } else {
-            symbolName = "speaker.wave.3.fill"
-        }
+        let symbolName = AppConfiguration.volumeSymbolName(for: volume)
         return NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)
     }
 

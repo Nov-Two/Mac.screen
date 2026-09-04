@@ -70,10 +70,13 @@ struct MacScreenApp: App {
             }
         }
         statusBarController.applySelectedWallpaper = {
-            applyWallpaper(store.previewItem)
+            store.applyWallpaper(store.previewItem, with: wallpaperController)
         }
         statusBarController.applyNextWallpaper = {
-            applyWallpaper(store.selectNextItem(after: wallpaperController.activeURL))
+            store.applyWallpaper(
+                store.selectNextItem(after: wallpaperController.activeURL),
+                with: wallpaperController
+            )
         }
         statusBarController.stopWallpaper = {
             wallpaperController.stop()
@@ -101,16 +104,6 @@ struct MacScreenApp: App {
                     await store.importDownloadedResource(at: downloadedURL)
                 }
             }
-        }
-    }
-
-    private func applyWallpaper(_ item: WallpaperItem?) {
-        guard let item else { return }
-
-        if wallpaperController.apply(videoURL: item.url) {
-            store.rememberLastWallpaper(item.url)
-        } else {
-            store.clearLastWallpaper()
         }
     }
 

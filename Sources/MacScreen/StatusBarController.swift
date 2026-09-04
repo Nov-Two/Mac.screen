@@ -124,14 +124,7 @@ final class StatusBarController: NSObject {
         let volume = wallpaperController?.volume ?? 0
         let view = NSView(frame: NSRect(x: 0, y: 0, width: 176, height: 28))
 
-        let iconName: String
-        if volume == 0 {
-            iconName = "speaker.slash.fill"
-        } else if volume < 0.5 {
-            iconName = "speaker.wave.1.fill"
-        } else {
-            iconName = "speaker.wave.3.fill"
-        }
+        let iconName = AppConfiguration.volumeSymbolName(for: volume)
 
         let iconView = NSImageView(image: NSImage(systemSymbolName: iconName, accessibilityDescription: nil) ?? NSImage())
         iconView.imageScaling = .scaleProportionallyUpOrDown
@@ -166,14 +159,7 @@ final class StatusBarController: NSObject {
 
         guard let container = sender.superview else { return }
 
-        let iconName: String
-        if volume == 0 {
-            iconName = "speaker.slash.fill"
-        } else if volume < 0.5 {
-            iconName = "speaker.wave.1.fill"
-        } else {
-            iconName = "speaker.wave.3.fill"
-        }
+        let iconName = AppConfiguration.volumeSymbolName(for: volume)
 
         if let iconView = container.viewWithTag(100) as? NSImageView {
             iconView.image = NSImage(systemSymbolName: iconName, accessibilityDescription: nil)

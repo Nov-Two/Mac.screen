@@ -26,6 +26,12 @@ enum WallpaperLibrary {
             .appendingPathComponent(AppConfiguration.userVideoDirectoryName, isDirectory: true)
     }
 
+    private static var userThumbnailsDirectory: URL {
+        AppConfiguration.applicationSupportBaseDirectory
+            .appendingPathComponent(AppConfiguration.applicationSupportDirectoryName, isDirectory: true)
+            .appendingPathComponent(AppConfiguration.thumbnailDirectoryName, isDirectory: true)
+    }
+
     static func loadItems() async -> [WallpaperItem] {
         var seenPaths = Set<String>()
         var allItems: [WallpaperItem] = []
@@ -58,9 +64,10 @@ enum WallpaperLibrary {
                 continue
             }
 
-            let destinationURL = uniqueDestinationURL(
+            let destinationURL = FileSystemHelper.uniqueFileURL(
                 for: sourceURL.lastPathComponent,
-                in: userVideoDirectory
+                in: userVideoDirectory,
+                fallbackExtension: "mp4"
             )
             try fileManager.copyItem(at: sourceURL, to: destinationURL)
             importedURLs.append(destinationURL)
@@ -231,22 +238,6 @@ enum WallpaperLibrary {
         UserDefaults.standard.set(Array(hiddenPaths).sorted(), forKey: UserDefaultsKeys.hiddenWallpaperPaths)
     }
 
-    private static func uniqueDestinationURL(for filename: String, in directory: URL) -> URL {
-        let fileManager = FileManager.default
-        let sourceURL = URL(fileURLWithPath: filename)
-        let baseName = sourceURL.deletingPathExtension().lastPathComponent
-        let pathExtension = sourceURL.pathExtension.isEmpty ? "mp4" : sourceURL.pathExtension
-
-        var destinationURL = directory.appendingPathComponent("\(baseName).\(pathExtension)")
-        var index = 2
-        while fileManager.fileExists(atPath: destinationURL.path) {
-            destinationURL = directory.appendingPathComponent("\(baseName) \(index).\(pathExtension)")
-            index += 1
-        }
-
-        return destinationURL
-    }
-
     /// 检查源文件列表中哪些文件名已在目标目录存在，返回重复的源 URL 列表。
     static func findDuplicateSourceURLs(in sourceURLs: [URL], directory: URL) -> [URL] {
         let fileManager = FileManager.default
@@ -322,7 +313,30 @@ enum WallpaperLibrary {
             return bundledThumbnail
         }
 
-        return generatedThumbnail(for: asset)
+        let cachedURL = userThumbnailsDirectory.appendingPathComponent(name)
+        if let cachedThumbnail = NSImage(contentsOf: cachedURL) {
+            return cachedThumbnail
+        }
+
+        guard let generated = generatedThumbnail(for: asset) else { return nil }
+        cacheThumbnail(generated, to: cachedURL)
+        return generated
+    }
+
+    private static func cacheThumbnail(_ image: NSImage, to url: URL) {
+        guard
+            let tiff = image.tiffRepresentation,
+            let representation = NSBitmapImageRep(data: tiff),
+            let png = representation.representation(using: .png, properties: [:])
+        else {
+            return
+        }
+
+        try? FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try? png.write(to: url)
     }
 
     private static func generatedThumbnail(for asset: AVAsset) -> NSImage? {
