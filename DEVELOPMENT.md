@@ -285,6 +285,7 @@ AUTO_UPDATE_GUIDE.md
 - UI 只关心状态和用户动作
 - 业务逻辑可以独立测试
 - UserDefaults、文件系统、登录项等系统依赖集中在 service 或专用 controller 中
+- `NSOpenPanel`、`NSAlert` 等弹窗交互集中在 `WallpaperDialogs`，`WallpaperStore` 只保留状态编排
 - 后续做偏好设置页或自动化测试时不需要重写主界面
 
 ### 资源扫描
@@ -311,7 +312,7 @@ Videos/示例壁纸.mp4
 Assets/Thumbnails/示例壁纸.mp4.png
 ```
 
-运行时优先读取 App bundle 中的 `Resources/Thumbnails`。如果读取失败，当前代码还有运行时兜底抽帧逻辑，但维护时应尽量保证构建阶段生成好缩略图，避免启动阶段解码视频。
+运行时优先读取 App bundle 中的 `Resources/Thumbnails`。对于用户导入的视频，首次抽帧生成的缩略图会缓存到 `~/Library/Application Support/MacScreen/Thumbnails/`，后续启动直接读取缓存，避免每次启动重复解码。如果读取失败，当前代码仍有运行时兜底抽帧逻辑，但维护时应尽量保证构建阶段生成好内置素材缩略图，避免启动阶段解码视频。
 
 ### 动态壁纸窗口
 
@@ -438,6 +439,8 @@ swift test
 - 下载导入后清理开关
 - 收藏路径持久化
 - 内置浏览器下载完成后的自动导入流程
+- 文件名去重（`FileSystemHelper.uniqueFileURL` 的重名追加序号与扩展名兜底）
+- 素材分类与标签推导（`WallpaperItem` 构造时预计算）
 
 不要在单元测试中直接注册系统登录项，测试应通过 mock `WallpaperServicing` 验证 Store 行为。
 
