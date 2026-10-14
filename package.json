@@ -1,0 +1,113 @@
+{
+  "name": "winscreen",
+  "version": "1.0.0",
+  "description": "Windows 桌面动态壁纸应用 —— MacScreen 的 Electron 实现，支持本地视频素材库、桌面层播放、托盘常驻与在线素材下载。",
+  "main": "src/main/main.js",
+  "author": {
+    "name": "Nov-Two",
+    "url": "https://github.com/Nov-Two/Mac.screen"
+  },
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "probe": "node scripts/probe-env.js",
+    "materials": "node scripts/build-materials.js",
+    "fetch": "node scripts/fetch-materials.js",
+    "icons": "node scripts/build-icons.js",
+    "dist": "npm run dist:win",
+    "dist:win": "electron-builder --win --x64",
+    "dist:zip": "electron-builder --win --x64 -c.win.target=zip",
+    "dist:portable": "electron-builder --win --x64 -c.win.target=portable",
+    "dist:dir": "electron-builder --win --x64 --dir",
+    "dist:mac": "electron-builder --mac --dir"
+  },
+  "dependencies": {
+    "@koromix/koffi-win32-x64": "^3.3.3",
+    "electron-updater": "^6.8.9",
+    "extract-zip": "^2.0.1",
+    "koffi": "^3.3.3"
+  },
+  "devDependencies": {
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.novtwo.winscreen",
+    "productName": "WinScreen",
+    "copyright": "Copyright © 2026 Nov-Two · 基于 MacScreen 设计",
+    "asar": true,
+    "asarUnpack": [
+      "**/node_modules/koffi/**",
+      "**/node_modules/@koromix/**"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json",
+      "!**/*.map",
+      "!**/node_modules/**/{test,__tests__,tests,example,examples,docs,doc}/**"
+    ],
+    "extraResources": [
+      {
+        "from": "videos",
+        "to": "videos",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "WinScreen",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://example.com/winscreen/releases/"
+      }
+    ]
+  }
+}

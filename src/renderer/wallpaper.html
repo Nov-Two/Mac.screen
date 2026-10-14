@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self' wsmedia:; media-src 'self' wsmedia: blob:; style-src 'unsafe-inline'; script-src 'self';"
+    />
+    <title>WinScreen Wallpaper</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+      }
+
+      #stage {
+        width: 100vw;
+        height: 100vh;
+        display: block;
+        background: #000;
+      }
+
+      body[data-fit='cover'] #stage {
+        object-fit: cover;
+      }
+
+      body[data-fit='contain'] #stage {
+        object-fit: contain;
+      }
+
+      body[data-fit='fill'] #stage {
+        object-fit: fill;
+      }
+
+      /* 视频还没出画面前先挡住，避免白闪 */
+      #veil {
+        position: fixed;
+        inset: 0;
+        background: #000;
+        transition: opacity 0.4s ease;
+      }
+
+      #veil.is-hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body data-fit="cover">
+    <div id="veil"></div>
+    <video id="stage" muted loop playsinline preload="auto" disablepictureinpicture></video>
+    <script src="wsmedia://app/wallpaper.js"></script>
+  </body>
+</html>

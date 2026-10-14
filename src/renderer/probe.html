@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>WinScreen Media Probe</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #000;
+        overflow: hidden;
+      }
+      video {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        background: #000;
+      }
+    </style>
+  </head>
+  <body>
+    <video id="probe" muted playsinline preload="auto"></video>
+    <script>
+      /**
+       * 在渲染进程里读视频元数据并截取一帧。
+       * 返回 { ok, width, height, duration, dataUrl, error }
+       *
+       * 之所以放在渲染进程做：Chromium 自带解码器，不需要额外打包 ffmpeg。
+       */
+      window.__probe = function probe(src, seekSeconds, maxWidth) {
+        return new Promise((resolve) => {
+          const video = document.getElementById('probe');
+          let settled = false;
+          let timer = null;
+
+          const finish = (payload) => {
+            if (settled) return;
+            settled = true;
+            if (timer) clearTimeout(timer);
+            try {
+              video.removeAttribute('src');
+              video.load();
+            } catch (e) {
+              /* 忽略 */
+            }
+            resolve(payload);
+          };
+
+          timer = setTimeout(() => finish({ ok: false, error: 'timeout' }), 25000);
+
+          const onError = () =>
+            finish({ ok: false, error: 'media-error', code: video.error && video.error.code });
+
+          const capture = () => {
+            const width = video.videoWidth;
+            const height = video.videoHeight;
+            const duration = Number.isFinite(video.duration) ? video.duration : null;
+            if (!width || !height) {
+              finish({ ok: false, error: 'no-dimensions', duration });
+              return;
+            }
+            try {
+              const scale = Math.min(1, (maxWidth || 480) / Math.max(width, 1));
+              const canvas = document.createElement('canvas');
+              canvas.width = Math.max(1, Math.round(width * scale));
+              canvas.height = Math.max(1, Math.round(height * scale));
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const dataUrl = canvas.toDataURL('image/png');
+              finish({ ok: true, width, height, duration, dataUrl });
+            } catch (error) {
+              // 极少数情况下 canvas 会被判定为跨域污染，此时仍返回元数据
+              finish({ ok: false, width, height, duration, error: String(error) });
+            }
+          };
+
+          const onLoadedMetadata = () => {
+            const duration = Number.isFinite(video.duration) ? video.duration : 0;
+            const target = Math.min(Math.max(seekSeconds || 0, 0), Math.max(duration - 0.15, 0));
+            if (target > 0.05) {
+              video.addEventListener('seeked', capture, { once: true });
+              try {
+                video.currentTime = target;
+              } catch (error) {
+                finish({ ok: false, error: String(error) });
+              }
+            } else if (video.readyState >= 2) {
+              capture();
+            } else {
+              video.addEventListener('loadeddata', capture, { once: true });
+            }
+          };
+
+          video.addEventListener('error', onError, { once: true });
+          video.addEventListener('loadedmetadata', onLoadedMetadata, { once: true });
+
+          video.src = src;
+          try {
+            video.load();
+          } catch (error) {
+            finish({ ok: false, error: String(error) });
+          }
+        });
+      };
+    </script>
+  </body>
+</html>
