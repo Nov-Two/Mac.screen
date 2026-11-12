@@ -17,7 +17,8 @@ permissions:
 jobs:
   build-dmg:
     name: Build and Upload DMG
-    runs-on: macos-14
+    # macos-14 镜像已于 2026-11-02 被 GitHub 停用，改用仍受支持的 macos-15（arm64）。
+    runs-on: macos-15
     env:
       HAS_DEVELOPER_ID: ${{ secrets.DEVELOPER_ID_CERTIFICATE_BASE64 != '' }}
       HAS_SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_ED_KEY != '' }}
