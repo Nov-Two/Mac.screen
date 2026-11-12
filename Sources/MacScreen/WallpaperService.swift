@@ -11,6 +11,7 @@ protocol WallpaperServicing: AnyObject {
 
     func setOpensAtLogin(_ isEnabled: Bool) throws
     func loadItems() async -> [WallpaperItem]
+    func duplicateSourceURLs(in urls: [URL]) -> [URL]
     func importVideos(from urls: [URL]) async throws -> WallpaperLibrary.ImportResult
     func importResources(from urls: [URL]) async throws -> WallpaperLibrary.ImportResult
     func deleteVideos(at urls: [URL]) throws -> String
@@ -83,6 +84,10 @@ final class DefaultWallpaperService: WallpaperServicing {
 
     func loadItems() async -> [WallpaperItem] {
         await WallpaperLibrary.loadItems()
+    }
+
+    func duplicateSourceURLs(in urls: [URL]) -> [URL] {
+        WallpaperLibrary.findDuplicateSourceURLs(in: urls, directory: WallpaperLibrary.userVideoDirectory)
     }
 
     func importVideos(from urls: [URL]) async throws -> WallpaperLibrary.ImportResult {

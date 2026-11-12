@@ -16,10 +16,12 @@ final class WallpaperStore: ObservableObject {
     @Published private(set) var favoriteWallpaperPaths: Set<String>
 
     private let service: WallpaperServicing
+    private let alerts: WallpaperAlertPresenting
 
-    init(service: WallpaperServicing? = nil) {
+    init(service: WallpaperServicing? = nil, alerts: WallpaperAlertPresenting? = nil) {
         let resolvedService = service ?? DefaultWallpaperService()
         self.service = resolvedService
+        self.alerts = alerts ?? SystemWallpaperAlertPresenter()
         restoresLastWallpaperOnLaunch = resolvedService.restoresLastWallpaperOnLaunch
         opensAtLogin = resolvedService.opensAtLogin
         pausesOnLowBattery = resolvedService.pausesOnLowBattery
@@ -39,14 +41,11 @@ final class WallpaperStore: ObservableObject {
     }
 
     func importVideos() async {
-        guard let urls = WallpaperDialogs.runVideoOpenPanel() else { return }
+        guard let urls = alerts.pickVideoFiles() else { return }
 
-        let duplicateURLs = WallpaperLibrary.findDuplicateSourceURLs(
-            in: urls,
-            directory: WallpaperLibrary.userVideoDirectory
-        )
+        let duplicateURLs = service.duplicateSourceURLs(in: urls)
         if !duplicateURLs.isEmpty {
-            WallpaperDialogs.showDuplicateAlert(duplicateURLs)
+            alerts.showDuplicateAlert(duplicateURLs)
             return
         }
 
@@ -64,7 +63,9 @@ final class WallpaperStore: ObservableObject {
                 rejectedLowResolutionFilenames: importResult.rejectedLowResolutionFilenames,
                 emptyMessage: "没有导入支持的视频文件。"
             )
-            WallpaperDialogs.showLowResolutionAlert(importResult.rejectedLowResolutionFilenames)
+            if !importResult.rejectedLowResolutionFilenames.isEmpty {
+                alerts.showLowResolutionAlert(importResult.rejectedLowResolutionFilenames)
+            }
         } catch {
             errorMessage = "导入失败：\(error.localizedDescription)"
         }
@@ -73,12 +74,9 @@ final class WallpaperStore: ObservableObject {
     }
 
     func importDownloadedResource(at url: URL) async {
-        let duplicateURLs = WallpaperLibrary.findDuplicateSourceURLs(
-            in: [url],
-            directory: WallpaperLibrary.userVideoDirectory
-        )
+        let duplicateURLs = service.duplicateSourceURLs(in: [url])
         if !duplicateURLs.isEmpty {
-            WallpaperDialogs.showDuplicateAlert(duplicateURLs)
+            alerts.showDuplicateAlert(duplicateURLs)
             return
         }
 
@@ -98,7 +96,9 @@ final class WallpaperStore: ObservableObject {
                 successPrefix: "下载完成，已自动导入"
             )
             cleanDownloadedResourceIfNeeded(at: url, didImport: !importResult.importedURLs.isEmpty)
-            WallpaperDialogs.showLowResolutionAlert(importResult.rejectedLowResolutionFilenames)
+            if !importResult.rejectedLowResolutionFilenames.isEmpty {
+                alerts.showLowResolutionAlert(importResult.rejectedLowResolutionFilenames)
+            }
         } catch {
             errorMessage = "自动导入下载资源失败：\(error.localizedDescription)"
         }

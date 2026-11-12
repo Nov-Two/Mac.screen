@@ -259,39 +259,51 @@ enum WallpaperLibrary {
     }
 
     private static func resolutionText(for asset: AVAsset) async -> String {
-        do {
-            let tracks = try await asset.loadTracks(withMediaType: .video)
-            guard let track = tracks.first else { return "--" }
-            let naturalSize = try await track.load(.naturalSize)
-            let transform = try await track.load(.preferredTransform)
-            let transformed = naturalSize.applying(transform)
-            let width = Int(abs(transformed.width).rounded())
-            let height = Int(abs(transformed.height).rounded())
-            return "\(width)x\(height)"
-        } catch {
+        guard let size = await largestVideoDisplaySize(for: asset) else {
             return "--"
         }
+
+        return "\(size.width)x\(size.height)"
     }
 
-    private static func isHighEnoughResolution(_ url: URL) async -> Bool {
-        guard let resolution = await videoResolution(for: AVURLAsset(url: url)) else {
-            return false
+    /// 只有确认分辨率低于阈值时才拒绝导入；读不出分辨率（未下载完整、编码暂无法解析等）
+    /// 不拦截，避免把真实的高清素材误报为“分辨率太低”。这类素材入库后分辨率显示为 "--"。
+    ///
+    /// 判定按横屏基准：宽 >= 1920 且高 >= 1080。竖屏素材（如 1080x1920）会被判定为不合格，
+    /// 这是刻意的产品取舍——桌面壁纸以横屏为主。该行为由单元测试锁定。
+    static func isHighEnoughResolution(_ url: URL) async -> Bool {
+        guard let size = await largestVideoDisplaySize(for: AVURLAsset(url: url)) else {
+            return true
         }
 
-        return resolution.width >= AppConfiguration.minimumImportedVideoWidth
-            && resolution.height >= AppConfiguration.minimumImportedVideoHeight
+        return size.width >= AppConfiguration.minimumImportedVideoWidth
+            && size.height >= AppConfiguration.minimumImportedVideoHeight
     }
 
-    private static func videoResolution(for asset: AVAsset) async -> (width: Int, height: Int)? {
+    /// 读取所有视频轨道中显示尺寸最大的那个；跳过尺寸为 0 或读取失败的轨道。
+    /// 避免部分文件带小尺寸的预览/缩略轨道时取到错误轨道而误判。
+    private static func largestVideoDisplaySize(for asset: AVAsset) async -> (width: Int, height: Int)? {
         do {
             let tracks = try await asset.loadTracks(withMediaType: .video)
-            guard let track = tracks.first else { return nil }
-            let naturalSize = try await track.load(.naturalSize)
-            let transform = try await track.load(.preferredTransform)
-            let transformed = naturalSize.applying(transform)
-            let width = Int(abs(transformed.width).rounded())
-            let height = Int(abs(transformed.height).rounded())
-            return (width, height)
+            var largest: (width: Int, height: Int)?
+            var largestArea = 0
+
+            for track in tracks {
+                let naturalSize = try await track.load(.naturalSize)
+                let transform = try await track.load(.preferredTransform)
+                let transformed = naturalSize.applying(transform)
+                let width = Int(abs(transformed.width).rounded())
+                let height = Int(abs(transformed.height).rounded())
+                guard width > 0, height > 0 else { continue }
+
+                let area = width * height
+                if area > largestArea {
+                    largestArea = area
+                    largest = (width, height)
+                }
+            }
+
+            return largest
         } catch {
             return nil
         }

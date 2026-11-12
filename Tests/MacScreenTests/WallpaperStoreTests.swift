@@ -102,6 +102,10 @@ private final class MockWallpaperService: WallpaperServicing {
         items
     }
 
+    func duplicateSourceURLs(in urls: [URL]) -> [URL] {
+        []
+    }
+
     func setOpensAtLogin(_ isEnabled: Bool) throws {
         opensAtLogin = isEnabled
     }

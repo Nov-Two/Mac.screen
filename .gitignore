@@ -12,3 +12,4 @@ DerivedData/
 *.xcodeproj/project.xcworkspace/xcuserdata/
 *.app/
 .superpowers/
+*.workbuddy-ai/

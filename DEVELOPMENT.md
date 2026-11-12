@@ -286,6 +286,7 @@ AUTO_UPDATE_GUIDE.md
 - 业务逻辑可以独立测试
 - UserDefaults、文件系统、登录项等系统依赖集中在 service 或专用 controller 中
 - `NSOpenPanel`、`NSAlert` 等弹窗交互集中在 `WallpaperDialogs`，`WallpaperStore` 只保留状态编排
+- `WallpaperStore` 通过 `WallpaperAlertPresenting` 协议调用弹窗和文件选择面板，默认实现 `SystemWallpaperAlertPresenter` 转发到 `WallpaperDialogs`；测试注入替身后可以断言"弹了几次、内容是什么"，不需要真实弹窗
 - 后续做偏好设置页或自动化测试时不需要重写主界面
 
 ### 资源扫描
@@ -441,6 +442,11 @@ swift test
 - 内置浏览器下载完成后的自动导入流程
 - 文件名去重（`FileSystemHelper.uniqueFileURL` 的重名追加序号与扩展名兜底）
 - 素材分类与标签推导（`WallpaperItem` 构造时预计算）
+- 导入弹窗契约（`WallpaperImportTests`）：无被拒文件时不弹低分辨率提示、有被拒文件时才弹、混合批次只列出被拒文件、取消选择不触发导入、重复文件跳过导入
+- 低分辨率提示内容（`WallpaperLowResolutionAlertContentTests`）：空名单返回 `nil`、文件名列表与省略规则
+- 分辨率判定（`VideoResolutionTests`）：用 `AVAssetWriter` 现场生成真实视频，覆盖合格/不合格分辨率、竖屏与旋转元数据、文件损坏或缺失时放行
+
+新增导入相关行为时，优先在 `WallpaperImportTests` 里通过注入的 `WallpaperAlertPresenting` 替身断言弹窗次数和内容，不要在测试中真实弹出 `NSAlert`。
 
 不要在单元测试中直接注册系统登录项，测试应通过 mock `WallpaperServicing` 验证 Store 行为。
 

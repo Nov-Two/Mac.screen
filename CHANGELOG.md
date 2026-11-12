@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-10-15
+
+### 修复：导入正常高清视频时误弹「视频分辨率太低」
+
+- 根因：`WallpaperStore` 在文件选择面板导入和下载自动导入两处**无条件**调用低分辨率弹窗，没有判断 `rejectedLowResolutionFilenames` 是否为空。导入合格视频时该数组为空，弹窗仍照常弹出，且正文里没有任何文件名
+- `WallpaperStore.importVideos()` / `importDownloadedResource(at:)` 改为仅在确实存在被拒文件时才弹窗，与同文件 `importMessage(...)` 的既有判断保持一致
+
+### 可测试性重构
+
+- 新增 `WallpaperAlertPresenting` 协议（`pickVideoFiles` / `showLowResolutionAlert` / `showDuplicateAlert`）和默认实现 `SystemWallpaperAlertPresenter`，`WallpaperStore` 通过构造参数注入。测试可断言"弹了几次、内容是什么"，无需真实弹窗
+- `WallpaperDialogs.lowResolutionAlertContent(for:)` 抽为纯函数，空名单返回 `nil`，让"空名单不弹窗"这条规则可被单元测试直接覆盖
+- `WallpaperServicing` 新增 `duplicateSourceURLs(in:)`，把重复检测纳入 service 抽象，使导入流程测试不再依赖真实素材目录
+- `WallpaperLibrary.isHighEnoughResolution` 由 `private` 改为模块内可见，便于直接测试分辨率判定
+
+### 测试
+
+- 新增 `WallpaperImportTests.swift`：14 个用例，覆盖"无被拒文件不弹窗"、"有被拒文件才弹窗"、"混合批次只列出被拒文件"、"取消选择不触发导入"、"重复文件跳过导入"，以及状态栏文案
+- 新增 `VideoResolutionTests.swift`：9 个用例，现场用 `AVAssetWriter` 生成真实视频，覆盖 1080p/1440p 通过、720p/360p/超宽扁比例被拒、原生竖屏与带 90° 旋转元数据的竖屏按显示尺寸判定、文件损坏或缺失时放行（fail-open）
+- 测试用例总数从 15 增至 38，全部通过
+- 已验证测试有效性：临时还原修复后，`testImportVideosDoesNotShowLowResolutionAlertWhenNothingWasRejected` 与 `testImportDownloadedResourceDoesNotShowLowResolutionAlertWhenNothingWasRejected` 会失败
+
 ## 2026-09-04
 
 - 用户导入视频的缩略图首次生成后缓存到 `Application Support/MacScreen/Thumbnails`，后续启动直接读缓存，避免每次启动重复解码
